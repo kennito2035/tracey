@@ -30,10 +30,20 @@
   !include LogicLib.nsh
 
   ; electron-builder's common.nsh sets both of these to `nevershow`, and this
-  ; include lands after it, so these win. Something that installs a trusted
-  ; certificate and a privileged background process should be willing to show
-  ; exactly what it put on the machine.
-  ShowInstDetails show
+  ; include lands after it, so these win.
+  ;
+  ; INSTALL details are left at `nevershow` on purpose. The pane CANNOT show a
+  ; live file list: installSection.nsh does `SetDetailsPrint none` on its first
+  ; line, before any custom macro can run, and customInstall is inserted after
+  ; extraction. Even without that, there is nothing per-file to print - the app
+  ; ships as ONE 7z archive unpacked by `Nsis7z::Extract` plus `CopyFiles
+  ; /SILENT`, neither of which emits per-file output. A visible pane could only
+  ; sit empty for the whole copy and then dump a listing at the end, which reads
+  ; as a hang and is worse than no pane at all. Progress bar only.
+  ;
+  ; UNINSTALL details stay visible: Delete/RMDir do print per file as they go,
+  ; and removing a trusted root certificate is worth showing the user.
+  ShowInstDetails nevershow
   ShowUninstDetails show
 
 ; The UNINSTALLER is a SEPARATE NSIS compile that also inserts customHeader, but
@@ -105,32 +115,11 @@ permission to steady your pen when it runs from a protected folder."
 !macroend
 
 !macro customInstall
-  ; installSection.nsh does `SetDetailsPrint none` at the TOP of the section, so
-  ; the per-file extraction lines are suppressed before anything custom runs and
-  ; cannot be recovered from here. Rather than 200 lines of "Extract: *.dll",
-  ; enumerate what actually landed - and keep printing for everything below, so
-  ; the certificate and permission steps are visible too. FindFirst walks the
-  ; real directory instead of a hardcoded list, so this cannot drift from what
-  ; the installer actually ships.
+  ; No file listing here - the install details pane is `nevershow` (see the note
+  ; in customHeader for why a live one is impossible), so anything printed would
+  ; be invisible. `SetDetailsPrint both` is still worth setting: it routes the
+  ; steps below to the status line above the progress bar, which IS visible.
   SetDetailsPrint both
-  DetailPrint "----------------------------------------------------------------"
-  DetailPrint "Installed to $INSTDIR :"
-  FindFirst $0 $1 "$INSTDIR\*.*"
-  traceyListLoop:
-    StrCmp $1 "" traceyListDone
-    StrCmp $1 "." traceyListNext
-    StrCmp $1 ".." traceyListNext
-    ${If} ${FileExists} "$INSTDIR\$1\*.*"
-      DetailPrint "   [folder] $1"
-    ${Else}
-      DetailPrint "   $1"
-    ${EndIf}
-    traceyListNext:
-    FindNext $0 $1
-    Goto traceyListLoop
-  traceyListDone:
-  FindClose $0
-  DetailPrint "----------------------------------------------------------------"
 
   SetShellVarContext all          ; makes $APPDATA mean C:\ProgramData, not the user's
   DetailPrint "Settings folder: $APPDATA\Tracey (kept if you uninstall)"
