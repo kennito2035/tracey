@@ -1,0 +1,48 @@
+/* Win32 resources for the native core (tracey.exe).
+ *
+ * The core is invisible by design - a full-virtual-desktop WS_POPUP overlay with
+ * WS_EX_TOOLWINDOW, so it has no taskbar button and no Alt+Tab entry. That made
+ * it easy to assume its icon and version strings do not matter. They do, in the
+ * one place that counts: the UAC prompt. Launching the core is the first thing a
+ * new user ever does, and without these resources Windows shows a blank generic
+ * icon and the bare filename "tracey.exe" beside an unfamiliar publisher - which
+ * is exactly what an untrustworthy program looks like.
+ *
+ * ID 1 for the icon: Explorer and the UAC consent UI use the icon with the
+ * LOWEST resource id as the application icon.
+ *
+ * Shared by every version snapshot the way uiaccess_manifest.xml is - one copy
+ * here, referenced by v1/v2/v3 and tracey-handoff/src build.ps1 alike.
+ */
+
+1 ICON "tracey.ico"
+
+1 VERSIONINFO
+FILEVERSION     0,1,0,0
+PRODUCTVERSION  0,1,0,0
+FILEOS          0x40004L    /* VOS_NT_WINDOWS32 */
+FILETYPE        0x1L        /* VFT_APP */
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    /* 0409 = en-US, 04B0 = Unicode. Must agree with the Translation value below
+       or Windows shows nothing at all rather than falling back. */
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName",      "Tracey"
+      /* FileDescription is what the UAC prompt puts in front of the user, so it
+         reads as a plain sentence rather than a process name. */
+      VALUE "FileDescription",  "Tracey - steadies pen input"
+      VALUE "FileVersion",      "0.1.0.0"
+      VALUE "InternalName",     "tracey"
+      VALUE "LegalCopyright",   "MIT licensed"
+      VALUE "OriginalFilename", "tracey.exe"
+      VALUE "ProductName",      "Tracey"
+      VALUE "ProductVersion",   "0.1.0.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

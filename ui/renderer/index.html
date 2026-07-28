@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;" />
+<title>Tracey</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <span class="mark" id="brandMark" aria-hidden="true"></span>
+    <span class="wordmark">tracey</span>
+  </div>
+  <!-- role="switch" + aria-checked, so it announces as "Dark mode, switch, on"
+       rather than as a button whose label flips under the user. -->
+  <button class="themeswitch" id="themeBtn" type="button" role="switch" aria-checked="true"
+          aria-label="Dark mode" title="Switch to light mode">
+    <span class="ts-track">
+      <svg class="ts-icon ts-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4.1" />
+        <path d="M12 2.6v2M12 19.4v2M4.8 4.8l1.4 1.4M17.8 17.8l1.4 1.4M2.6 12h2M19.4 12h2M4.8 19.2l1.4-1.4M17.8 6.2l1.4-1.4" />
+      </svg>
+      <svg class="ts-icon ts-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"
+           fill="currentColor">
+        <path d="M20.6 14.5A8.7 8.7 0 0 1 9.5 3.4a8.9 8.9 0 1 0 11.1 11.1z" />
+      </svg>
+      <span class="ts-thumb" aria-hidden="true"></span>
+    </span>
+  </button>
+</header>
+
+<main>
+
+  <!-- The one control that matters. -->
+  <section class="hero">
+    <!-- aria-label, not just aria-describedby: a role="switch" with no text content
+         has no accessible NAME, so a screen reader announces only "switch, checked". -->
+    <button class="bigswitch" id="toggle" type="button" role="switch" aria-checked="false"
+            aria-label="Steady my pen" aria-describedby="heroText">
+      <span class="track"><span class="knob" aria-hidden="true"></span></span>
+    </button>
+
+    <h1 id="heroTitle">Getting ready…</h1>
+    <p id="heroText" class="hero-sub">Looking for Tracey on this computer.</p>
+    <p id="heroError" class="hero-error" role="alert" hidden></p>
+  </section>
+
+  <!-- Two plain choices, both optional. -->
+  <section class="choices">
+    <button class="card" id="openCal" type="button">
+      <span class="card-title">Set up for my hand</span>
+      <span class="card-sub">Scribble for ten seconds so Tracey learns your own shake</span>
+      <span class="go" aria-hidden="true">→</span>
+    </button>
+
+    <button class="card" id="openTry" type="button">
+      <span class="card-title">Try it out</span>
+      <span class="card-sub">Draw on a practice pad and see the difference</span>
+      <span class="go" aria-hidden="true">→</span>
+    </button>
+  </section>
+
+  <!-- Amount of help. Named, never numbered. -->
+  <section class="help-block">
+    <h2>How much help?</h2>
+    <!-- Four cards in one row. The fourth is Custom: calibration chooses from
+         FIVE levels and only one coincides with a named card, so without it a
+         calibrated profile left every card unselected. It is a real choice —
+         picking it re-applies the calibrated profile — and is disabled until a
+         calibration exists to apply. Built in app.js so all four share code. -->
+    <div class="presets" id="presets" role="group" aria-label="How much help"></div>
+  </section>
+
+  <!-- Everything a developer needs, and nothing a user does. -->
+  <details class="advanced" id="advanced">
+    <summary>Advanced settings</summary>
+
+    <!-- Every group gets the same small-caps heading and its own separator, so
+         the panel reads as three sections instead of one wall of controls. -->
+    <section class="group">
+      <h3 class="group-label">Fine tuning</h3>
+
+    <div class="slider-row">
+      <div class="slider-head">
+        <label for="fmin">Smoothing</label>
+        <output class="num" id="fminOut">0.400</output>
+      </div>
+      <div class="slider-line">
+        <button class="step" type="button" data-target="fmin" data-dir="-1" aria-label="More smoothing">−</button>
+        <input type="range" id="fmin" min="0.15" max="1" step="0.01" value="0.4" aria-describedby="fminHelp" />
+        <button class="step" type="button" data-target="fmin" data-dir="1" aria-label="Less smoothing">+</button>
+      </div>
+      <p class="help" id="fminHelp"><span>Steadier, slight lag</span><span>Follows your hand exactly</span></p>
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-head">
+        <label for="beta">Fast-stroke response</label>
+        <output class="num" id="betaOut">0.0200</output>
+      </div>
+      <div class="slider-line">
+        <button class="step" type="button" data-target="beta" data-dir="-1" aria-label="Less fast-stroke response">−</button>
+        <input type="range" id="beta" min="0.007" max="0.08" step="0.001" value="0.02" aria-describedby="betaHelp" />
+        <button class="step" type="button" data-target="beta" data-dir="1" aria-label="More fast-stroke response">+</button>
+      </div>
+      <p class="help" id="betaHelp"><span>Smooth on quick strokes</span><span>Snaps back on quick strokes</span></p>
+    </div>
+    </section>
+
+    <section class="group">
+      <h3 class="group-label">Tracey core</h3>
+      <div class="switch-row">
+        <span class="switch-label" id="coreState">Not running</span>
+        <button class="miniswitch" id="coreSwitch" type="button" role="switch" aria-checked="false"
+                aria-label="Tracey core">
+          <span class="ms-track"><span class="ms-knob" aria-hidden="true"></span></span>
+        </button>
+      </div>
+      <p class="help"><span>The big switch only pauses. Turning this off closes Tracey completely.</span></p>
+    </section>
+
+    <section class="group">
+      <h3 class="group-label">Settings folder</h3>
+      <p class="path" id="dirPath">—</p>
+      <div class="diag-row">
+        <span class="tag" id="tagStatus">status.cfg</span>
+        <span class="tag" id="tagWrite">write access</span>
+        <span class="tag" id="tagCore">core</span>
+        <span class="tag" id="tagPen">pen tablet</span>
+      </div>
+      <div class="row-actions">
+        <button class="soft" id="openFolder" type="button">Open folder</button>
+        <button class="soft" id="clearCal" type="button">Clear calibration data</button>
+      </div>
+      <p class="warn num" id="writeNote" hidden></p>
+    </section>
+  </details>
+
+</main>
+
+<!-- Practice pad -->
+<dialog id="tryDialog" aria-labelledby="tryTitle">
+  <h2 id="tryTitle">Practice pad</h2>
+  <p class="dialog-sub">Draw anything. The pale line is your hand. The bold line is what Tracey sends to your apps.</p>
+
+  <div class="canvas-wrap">
+    <canvas id="trace" aria-label="Practice area comparing your stroke with the steadied stroke"></canvas>
+    <p class="canvas-hint" id="canvasHint">Write your name, or draw a circle</p>
+  </div>
+
+  <div class="pad-foot">
+    <label class="check">
+      <input type="checkbox" id="simShake" />
+      <span>Pretend my hand shakes</span>
+    </label>
+    <p class="reduce">Wobble removed <b class="num" id="mReduce">—</b></p>
+  </div>
+
+  <div class="dialog-actions">
+    <button class="soft" id="clearTrace" type="button">Clear</button>
+    <button class="primary" id="tryClose" type="button">Done</button>
+  </div>
+</dialog>
+
+<!-- Calibration -->
+<dialog id="calDialog" aria-labelledby="calTitle">
+  <h2 id="calTitle">Set up for my hand</h2>
+
+  <ol class="steps" id="calSteps">
+    <li data-step="1" class="on"><span>1</span><span>Rest your hand comfortably</span></li>
+    <li data-step="2"><span>2</span><span>Scribble loosely for ten seconds</span></li>
+    <li data-step="3"><span>3</span><span id="calStep3">Tracey learns your shake</span></li>
+  </ol>
+
+  <!-- Display only: it shows the stroke the CORE measured. Nothing here is
+       drawable, so it needs to say what it is for. -->
+  <div class="canvas-wrap">
+    <canvas id="calCanvas" aria-label="Your measured stroke"></canvas>
+    <p class="canvas-hint" id="calHint">Your scribble will appear here</p>
+  </div>
+
+  <div class="progress" id="calProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+    <div class="progress-fill" id="calFill"></div>
+  </div>
+
+  <p class="cal-msg" id="calMsg" role="status" aria-live="polite">Press Start when you are ready.</p>
+  <p class="cal-result" id="calResult" hidden></p>
+
+  <div class="dialog-actions">
+    <button class="soft" id="calClose" type="button">Close</button>
+    <button class="primary" id="calRecord" type="button">Start</button>
+  </div>
+</dialog>
+
+<!-- Replaces the native scrollbar. Hidden until the page actually overflows. -->
+<div class="scrollbar" id="scrollbar" aria-hidden="true" hidden>
+  <div class="scrollbar-thumb" id="scrollThumb"></div>
+</div>
+
+<script src="oneeuro.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

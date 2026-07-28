@@ -1,0 +1,21 @@
+# Line endings. This repo is developed on Windows and Linux at once (the core is
+# Windows-only; the UI is built on Pop!_OS), so leaving this to each machine's
+# core.autocrlf setting is how mock-core.sh ends up with CRLF and dies on Linux
+# with "bad interpreter: No such file or directory".
+* text=auto
+
+# Must stay LF wherever they land - a shell script with CRLF is not executable.
+*.sh    text eol=lf
+
+# Must stay CRLF - PowerShell and cmd are Windows-only here, and CRLF is what
+# every tool on that side expects.
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+
+# Never touch these: line-ending translation corrupts binaries.
+*.png   binary
+*.gif   binary
+*.ico   binary
+*.exe   binary
+*.cer   binary

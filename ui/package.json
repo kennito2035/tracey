@@ -1,0 +1,47 @@
+{
+  "name": "tracey-ui",
+  "version": "0.1.0",
+  "description": "Steadies pen and tablet input for people with a hand tremor",
+  "author": "Tracey",
+  "main": "electron/main.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "mock": "node tools/mock-core.js",
+    "mock:calibrate": "node tools/mock-core.js --calibrate",
+    "verify": "node tools/verify.js",
+    "icons": "python tools/make_icons.py",
+    "prepare-core": "node tools/prepare-core.js",
+    "dist": "node tools/prepare-core.js && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "org.tracey.ui",
+    "productName": "Tracey",
+    "files": ["electron/**", "renderer/**", "assets/**", "package.json"],
+    "extraFiles": [
+      { "from": "build/core/tracey.exe", "to": "tracey-core.exe" },
+      { "from": "build/core/TraceyDevSigning.cer", "to": "TraceyDevSigning.cer" }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
+      "license": "build/CERTIFICATE_NOTICE.txt",
+      "include": "build/installer.nsh",
+      "artifactName": "Tracey-Setup-${version}.exe",
+      "shortcutName": "Tracey",
+      "createDesktopShortcut": false,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

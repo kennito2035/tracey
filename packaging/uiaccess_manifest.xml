@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity
+    version="1.0.0.0"
+    processorArchitecture="amd64"
+    name="Tracey.Overlay"
+    type="win32"
+  />
+
+  <!--
+    trustInfo / requestedExecutionLevel
+
+    requireAdministrator + uiAccess true grants RegisterPointerInputTarget and
+    lets us receive input despite WS_EX_TRANSPARENT.
+
+    uiAccess true ONLY takes effect if BOTH conditions below are met:
+      1. This exe is signed with a cert trusted on the machine (see v1/build.ps1)
+      2. This exe runs from Program Files or System32
+    If either is false, Windows silently ignores uiAccess and runs without it,
+    RegisterPointerInputTarget will go back to ACCESS_DENIED.
+  -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel
+          level="requireAdministrator"
+          uiAccess="true"
+        />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <!-- Windows version compatibility, required for reliable manifest processing on Win10/11 -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </compatibility>
+
+  <!--
+    DPI AWARENESS - REQUIRED, not cosmetic.
+
+    Without this the process is DPI-UNAWARE and Windows virtualizes every
+    coordinate it gives us and every coordinate we inject. On a 1920x1080 display
+    at 125% scaling a DPI-unaware process sees only 1536x864, so:
+      - our full-virtual-desktop overlay covers just the top-left 80% x 80%
+      - GetPointerPenInfo positions and InjectSyntheticPointerInput positions are
+        in that shrunken space
+    The visible symptom is a pen/cursor that cannot reach the bottom or right of
+    the screen. Per-Monitor V2 makes us work in real pixels, which is what both
+    the pointer APIs and the injection path expect.
+  -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+    </windowsSettings>
+  </application>
+</assembly>

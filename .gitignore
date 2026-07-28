@@ -1,0 +1,28 @@
+# Build output
+dist/
+build/
+*.exe
+*.obj
+*.lib
+*.exp
+*.dll
+
+# ...but ui/build is CONFIGURATION, not output: it holds the NSIS include and the
+# certificate consent page the installer is built from. The bare `build/` rule
+# above matches at any depth and would have excluded both, leaving a repo whose
+# installer nobody can rebuild. Git will not descend into an ignored directory,
+# so the directory itself has to be un-ignored before anything inside it can be.
+!ui/build/
+# The staged core + certificate are copied in by tools/prepare-core.js at build
+# time and must NOT be committed (also caught by *.exe above; explicit is better).
+ui/build/core/
+
+# Logs / local runtime files
+*.log
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vs/
+.vscode/
+*.user

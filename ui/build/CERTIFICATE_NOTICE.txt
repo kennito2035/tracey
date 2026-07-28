@@ -1,0 +1,67 @@
+TRACEY - PLEASE READ BEFORE INSTALLING
+
+Tracey steadies pen and tablet input for people with a tremor. It filters your
+pen as you draw and re-injects the smoothed stroke, so it works in every app on
+this computer, not just one drawing program.
+
+This installer does something most installers do not, and you should agree to it
+knowingly.
+
+
+1. IT INSTALLS A SECURITY CERTIFICATE
+
+To capture and re-inject pen input, Tracey needs a Windows privilege called
+uiAccess. Windows only grants it to a program that is BOTH installed in Program
+Files AND signed by a certificate this computer trusts.
+
+Tracey is signed with its own certificate, "Tracey Dev Signing". This installer
+adds that certificate to your computer's Trusted Root store. Without it Windows
+refuses to start Tracey at all - no error you can act on, no pen filtering.
+
+
+2. WHAT THAT MEANS, PLAINLY
+
+While the certificate is installed, any program signed with the matching private
+key would be treated by this computer as coming from a known publisher.
+
+The scope is limited in two ways that are worth knowing:
+
+  - The certificate is marked for CODE SIGNING only. It cannot be used to
+    impersonate websites or intercept encrypted web traffic.
+
+  - The private key is not on this computer and is not part of this installer.
+    Only the public certificate is installed here.
+
+The honest summary: this is a self-signed certificate from a small project, not
+one issued by a commercial certificate authority. It is the standard way to ship
+software that needs uiAccess without buying a commercial certificate. If you are
+installing this on a managed or work computer, ask whoever administers it first.
+
+
+3. HOW TO REMOVE IT
+
+Uninstalling Tracey removes the certificate automatically.
+
+You can also remove it by hand at any time: press Start, type "Manage computer
+certificates", open Trusted Root Certification Authorities > Certificates, and
+delete "Tracey Dev Signing". Tracey will stop working; nothing else will.
+
+
+4. WHAT ELSE THE INSTALLER DOES
+
+  - Installs Tracey to C:\Program Files\Tracey. This location is not adjustable:
+    Windows only grants uiAccess from a protected folder, so installing anywhere
+    else would produce a Tracey that looks installed and never filters anything.
+
+  - Creates C:\ProgramData\Tracey and allows standard users to write to it. That
+    folder is how the settings window talks to the part of Tracey that runs with
+    higher privileges. It holds your smoothing settings and your calibration.
+    If you already have one from a previous install, it is kept and used as-is.
+    Uninstalling ASKS whether to delete it, and keeps it unless you say otherwise,
+    so a reinstall can pick your calibration back up.
+
+  - Does not start anything automatically, collect any data, or connect to the
+    internet. Tracey runs only when you turn it on.
+
+
+Selecting "I Agree" installs Tracey and the certificate described above.

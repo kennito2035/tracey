@@ -1,0 +1,874 @@
+/* Tracey UI
+   Built for hands that shake and eyes that tire. Light by default because
+   large fields of bright text on near-black halate for people with the
+   astigmatism that often comes with age; dark is one click away for anyone
+   who needs it. Soft shadows instead of hairlines, generous radii, nothing
+   smaller than 17px, no number on screen a user has to understand. */
+
+:root {
+  color-scheme: light;
+
+  /* Muted greys, not paper white. A window that sits open all day beside a
+     drawing app should not be the brightest thing on the screen; pure #FFF
+     cards on a near-white page glare, especially for older eyes. Cards stay
+     one step lighter than the page so they still read as raised. */
+  --bg:        #E3E0D9;
+  --surface:   #EFEDE7;
+  --sunk:      #D8D4CC;
+  --ink:       #23211D;
+  --muted:     #54504A;
+  --line:      #CDC8C0;
+
+  /* Accents are deliberately muted in light mode: this window sits open all day
+     next to whatever the user is drawing in, so large saturated fields tire the
+     eye and compete with the artwork. Text colours below are NOT softened - they
+     carry the contrast ratios the design depends on. */
+  --steady:      #2C8C82;   /* fills and large type */
+  --steady-ink:  #0A6B60;   /* small type on light, 6.4:1 */
+  --steady-fill: #0B7F72;   /* filled buttons: white text = 4.9:1 */
+  --steady-soft: #EFF6F5;   /* page wash, tag + toggle backgrounds */
+  --shake:       #8F5417;   /* text; strokes use --shake-stroke. Darkened when the
+                               surfaces went warm/darker - the old #A05E1C fell to
+                               4.36:1 on the new card colour. */
+  --shake-stroke:#B8813F;
+  --shake-soft:  #FBF6EF;
+  --focus:       #1B6FD4;
+
+  --shadow-sm: 0 1px 2px rgba(23,34,46,.05), 0 3px 10px rgba(23,34,46,.05);
+  --shadow-md: 0 2px 4px rgba(23,34,46,.05), 0 14px 34px rgba(23,34,46,.07);
+
+  --display: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif;
+  --body:    "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+  --mono:    "Cascadia Mono", Consolas, ui-monospace, monospace;
+
+  --r: 22px;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg:        #131C26;
+  --surface:   #1B2733;
+  --sunk:      #16202B;
+  --ink:       #EAF1F7;
+  --muted:     #9BAFC2;
+  --line:      #2A3A4A;
+
+  --steady:      #4FD1C5;
+  --steady-ink:  #6FDCD1;
+  --steady-fill: #4FD1C5;
+  --steady-soft: rgba(79,209,197,.14);
+  --shake:       #F0A85F;
+  --shake-stroke:#F0A85F;
+  --shake-soft:  rgba(240,168,95,.13);
+  --focus:       #7DD3FC;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.28);
+  --shadow-md: 0 12px 32px rgba(0,0,0,.34);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background:
+    radial-gradient(1100px 420px at 50% -140px, var(--steady-soft), transparent 70%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------- scrollbar */
+/* The native Windows bar is a permanent grey slab down the edge of a window
+   meant to sit open beside artwork, and it cannot be animated - Chromium does
+   not run transitions on ::-webkit-scrollbar pseudo-elements. So it is removed
+   outright and replaced by a real element that fades in while the page moves.
+
+   It stays DRAGGABLE, with a 16px hit zone around an 8px bar that widens on
+   hover. A hairline you cannot grab would be a genuine loss for hands that
+   shake, which is the whole point of this app. */
+
+html { scrollbar-width: none; }
+::-webkit-scrollbar { width: 0; height: 0; }
+
+.scrollbar {
+  position: fixed;
+  top: 8px; right: 2px; bottom: 8px;
+  width: 16px;
+  z-index: 40;
+  opacity: 0;
+  transition: opacity .28s ease;
+  touch-action: none;
+}
+
+.scrollbar.on { opacity: 1; }
+
+.scrollbar-thumb {
+  position: absolute;
+  top: 0; right: 5px;
+  width: 5px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background-color .18s ease, width .18s ease, right .18s ease;
+}
+
+/* Thickens under the pointer, so the thin resting state costs nothing in
+   grabbability - the 16px hit zone is on .scrollbar either way. */
+.scrollbar:hover .scrollbar-thumb,
+.scrollbar.dragging .scrollbar-thumb {
+  width: 8px; right: 4px;
+  background: var(--muted);
+}
+
+/* Fading is motion. With it suppressed the bar would blink in and out, so it
+   simply stays put instead. */
+@media (prefers-reduced-motion: reduce) {
+  .scrollbar { opacity: 1; }
+}
+
+/* -------------------------------------------------------------------- bar */
+
+/* Right padding is tighter than left on purpose: the theme control is a compact
+   switch, and the wider 26px gutter left a conspicuous empty band beside it. */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Vertical space here is expensive: the four "How much help?" cards have to
+     fit above the fold in a 683px viewport, and measured they overran it by
+     15px. 12px, not 18px, buys a quarter of that back for free. Trimmed again
+     to 8/10: the dead band above the big switch measured 44px (bar 12 + 12,
+     main 4, hero 6, the switch's own transparent 10) and read as the window
+     starting too low. Now 28px, and the 16px goes to the fold problem above. */
+  padding: 8px 20px 10px 26px;
+}
+
+.brand { display: flex; align-items: center; gap: 11px; }
+
+/* The app icon at 24px: a rounded tile carrying the same wave as the icon and the
+   big switch's knob. The old inset ring is gone — it left only a 16px core of
+   colour, too small for the wave to read.
+   background-COLOR, never the `background` shorthand, in every rule below: the
+   shorthand resets background-image, which would silently erase the wave. */
+.mark {
+  width: 24px; height: 24px;
+  border-radius: 8px;
+  background-color: var(--steady);
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 22'%3E%3Cpath d='M2 11c4-9 8 9 12 0s8 4 12 0 8-1 16 0' fill='none' stroke='%23ffffff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 17px 8.5px;
+  transition: background-color .22s ease;
+}
+
+/* Dark theme runs the light teal, so the wave goes dark — which is the app icon
+   exactly. On the light theme's darker teal a white wave is the readable one. */
+html[data-theme="dark"] .mark {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 22'%3E%3Cpath d='M2 11c4-9 8 9 12 0s8 4 12 0 8-1 16 0' fill='none' stroke='%23131C26' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* The mark carries Tracey's state, so it reads at a glance from anywhere in the
+   window: steadying, paused, stopped. Same three states the big switch shows. */
+.mark.is-on     { background-color: var(--steady); }
+.mark.is-paused { background-color: var(--shake-stroke); }
+.mark.is-off    { background-color: var(--muted); }
+
+.wordmark {
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+
+/* ------------------------------------------------------------ theme switch */
+/* Rectangular, not a pill: it must not be mistaken for the round on/off switch
+   in the hero, which is the only control that changes what Tracey does. Both
+   icons stay visible so the two states are readable at a glance rather than
+   remembered. The 6px padding keeps the hit target at 80x48 while the drawn
+   control stays small. */
+
+.themeswitch {
+  flex: none;
+  padding: 6px;
+  background: none;
+  border: 0;
+  border-radius: 15px;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.ts-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 68px; height: 36px;
+  padding: 0 9px;
+  border-radius: 11px;
+  background: var(--sunk);
+  box-shadow: inset 0 0 0 2px var(--line);
+  transition: box-shadow .22s ease;
+}
+
+.ts-thumb {
+  position: absolute;
+  left: 4px; top: 4px;
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform .3s cubic-bezier(.34,1.4,.5,1);
+}
+
+/* 68 - 4 - 4 - 28 = 32: the thumb lands flush in the right inset. */
+.themeswitch[aria-checked="true"] .ts-thumb { transform: translateX(32px); }
+
+/* Above the thumb, so the active icon reads as sitting ON the raised block. */
+.ts-icon { position: relative; z-index: 1; transition: color .2s ease, opacity .2s ease; }
+
+.ts-sun  { color: var(--shake); }
+.ts-moon { color: var(--muted); opacity: .45; }
+.themeswitch[aria-checked="true"] .ts-sun  { color: var(--muted); opacity: .45; }
+.themeswitch[aria-checked="true"] .ts-moon { color: var(--steady); opacity: 1; }
+
+.themeswitch:hover .ts-track { box-shadow: inset 0 0 0 2px var(--steady); }
+.themeswitch:active .ts-thumb { transform: scale(.9); }
+.themeswitch[aria-checked="true"]:active .ts-thumb { transform: translateX(32px) scale(.9); }
+
+/* ----------------------------------------------------------------- layout */
+
+main {
+  max-width: 620px;
+  margin: 0 auto;
+  /* Top is 0, not 4: .bar's bottom padding and .bigswitch's own 10px of
+     transparent hit area already separate the header from the switch. */
+  padding: 0 26px 48px;
+}
+
+/* ------------------------------------------------------------------- hero */
+/* One control, oversized on purpose. The boldness budget is spent here. */
+
+.hero { text-align: center; padding: 0 0 12px; }
+
+.bigswitch {
+  border: 0;
+  background: none;
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.track {
+  display: block;
+  width: 208px; height: 96px;
+  border-radius: 999px;
+  background: var(--sunk);
+  box-shadow: inset 0 0 0 2px var(--line);
+  padding: 8px;
+  transition: background .22s ease, box-shadow .22s ease;
+}
+
+.knob {
+  display: block;
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform .38s cubic-bezier(.34,1.45,.5,1), background .22s ease;
+  position: relative;
+}
+
+/* the wave mark from the tray icon, flattening left to right */
+.knob::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: no-repeat center/44px 22px
+    url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 22'%3E%3Cpath d='M2 11c4-9 8 9 12 0s8 4 12 0 8-1 16 0' fill='none' stroke='%235A6B7C' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  opacity: .55;
+}
+
+.bigswitch[aria-checked="true"] .track {
+  background: var(--steady-soft);
+  box-shadow: inset 0 0 0 2px var(--steady);
+}
+
+.bigswitch[aria-checked="true"] .knob {
+  transform: translateX(112px);
+  background: var(--steady);
+}
+
+.knob::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: no-repeat center/44px 22px
+    url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 22'%3E%3Cpath d='M2 11c6-2.5 10 2.5 16 0s10 1.6 24 0' fill='none' stroke='%23ffffff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  opacity: 0;
+  transition: opacity .3s ease .12s;
+}
+
+.knob::after { transition: opacity .25s ease; }
+
+.bigswitch[aria-checked="true"] .knob::after { opacity: 0; }
+.bigswitch[aria-checked="true"] .knob::before { opacity: 1; }
+
+.bigswitch:active:not([disabled]) .knob { transform: scale(.93); }
+.bigswitch[aria-checked="true"]:active:not([disabled]) .knob { transform: translateX(112px) scale(.93); }
+
+/* when on, the track breathes a slow calm glow */
+.bigswitch[aria-checked="true"] .track { animation: settle 3.8s ease-in-out infinite; }
+@keyframes settle {
+  0%, 100% { box-shadow: inset 0 0 0 2px var(--steady), 0 0 0 0 rgba(15,158,142,0); }
+  50%      { box-shadow: inset 0 0 0 2px var(--steady), 0 0 26px 3px var(--steady-soft); }
+}
+
+.bigswitch[disabled] { opacity: .5; cursor: not-allowed; }
+
+h1 {
+  font-family: var(--display);
+  font-size: 34px;
+  font-weight: 650;
+  letter-spacing: -.025em;
+  margin: 16px 0 0;
+}
+
+/* 40ch wrapped the running-state line ("Smoothing your hand in every app on this
+   computer.") onto two lines, which made the hero jump in height every time the
+   state changed. Wide enough for that line to sit on one; genuinely longer
+   messages, like the no-tablet warning, still wrap. */
+.hero-sub {
+  margin: 6px auto 0;
+  max-width: 54ch;
+  font-size: 17.5px;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- choices */
+
+.choices { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: left;
+  min-height: 128px;
+  padding: 22px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
+.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.card:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+.card-title { font-size: 19px; font-weight: 650; letter-spacing: -.012em; }
+.card-sub { font-size: 15px; color: var(--muted); line-height: 1.45; }
+
+/* ------------------------------------------------------------------- help */
+
+.help-block { margin-top: 20px; }
+
+.help-block h2 {
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -.015em;
+  margin: 0 0 14px;
+}
+
+/* Four cards in one row: the three named levels plus Custom. Everything shrinks
+   a step at four-up rather than pushing Custom onto a line of its own, which
+   read as a separate thing rather than a fourth choice. */
+.presets { display: grid; gap: 10px; grid-template-columns: repeat(4, 1fr); }
+
+/* Explicit column flex, NOT the button default. A <button> centres its content
+   vertically, and these cards are stretched to a common height by the grid while
+   their hint text is 1 or 2 lines - so the one-line hint ("A good place to
+   start.") pushed its whole block half a line down and the three titles sat on
+   different baselines. .card already avoids this the same way. */
+.preset {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  min-height: 96px;
+  padding: 14px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid transparent;
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease;
+}
+
+.preset b { display: block; font-size: 15.5px; font-weight: 650; margin-bottom: 3px; letter-spacing: -.01em; }
+.preset span { display: block; font-size: 13px; color: var(--muted); line-height: 1.35; }
+
+/* Not selectable until there is a calibration for it to apply. */
+.preset:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  box-shadow: none;
+  background: var(--sunk);
+}
+.preset:disabled::after { display: none; }
+
+.preset[aria-pressed="true"] { border-color: var(--steady); background: var(--steady-soft); }
+.preset[aria-pressed="true"] b { color: var(--steady-ink); }
+
+/* Custom is the fourth card, not a banner: it applies the saved calibration.
+   Enabled state is deliberately unremarkable — it is one choice among four. */
+.preset-custom:not(:disabled) b { color: var(--steady-ink); }
+
+/* Failures the user must actually see. #writeNote lives inside the collapsed
+   Advanced panel, so anything reported only there is invisible in practice. */
+.hero-error {
+  /* 52ch, not 34ch. These messages split themselves with a newline into "what
+     happened" / "what to do", and box-sizing is border-box globally, so 34ch left
+     only ~243px of text — the 49-character first sentence wrapped and a deliberate
+     two-line message rendered as three. Measured at 52ch: 2 lines. */
+  max-width: min(100%, 52ch);
+  margin: 14px auto 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--shake-soft);
+  color: var(--shake);
+  font-size: 15px;
+  line-height: 1.45;
+  /* Honour the newline these messages use to split "what happened" from "what to
+     do", while still collapsing the incidental whitespace of a concatenated string. */
+  white-space: pre-line;
+}
+
+/* --------------------------------------------------------------- advanced */
+
+.advanced {
+  /* 36px, and it is load-bearing rather than taste. The old 60px implemented the
+     opposite intent — push the whole panel BELOW the fold so its rounded top edge
+     could not peek — and it never actually achieved that: measured in Electron at
+     700x720 the viewport is 683px and the panel top landed at 676, so 7px of it
+     showed and read as cut off. The rule now is that the COLLAPSED summary must
+     fit entirely, with this gap wide enough that the panel reads as its own zone
+     rather than as a fifth preset card. 36 is deliberately larger than the 20px
+     that separates every other section. It costs more than the layout had, which
+     is why the window is 780 and not 720 — see createWindow() in main.js; the two
+     numbers are a pair, so changing either without re-measuring re-breaks this.
+     Measured across all seven hero states with the pad cards both enabled and
+     disabled: viewport 743, summary bottom 722 in every one, 21px clear.
+     RE-MEASURE if anything above changes height. The rig is scratchpad/measure.js:
+     it drives a real BrowserWindow with these exact options. autoHideMenuBar is
+     worth 24px of viewport; omit it and every number here is wrong. */
+  margin-top: 36px;
+  background: var(--surface);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.advanced summary {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.advanced summary::-webkit-details-marker { display: none; }
+.advanced summary::before { content: "›"; margin-right: 10px; font-size: 20px; transition: transform .18s ease; }
+.advanced[open] summary::before { transform: rotate(90deg); }
+.advanced[open] summary { color: var(--ink); border-bottom: 1px solid var(--line); }
+
+.advanced > *:not(summary) { margin-left: 22px; margin-right: 22px; }
+/* Bottom space belongs to the panel, NOT to a :last-child margin. The last child
+   is #writeNote, which is hidden unless a write fails, so a margin on it renders
+   nothing and the buttons end up flush against the panel edge. */
+.advanced[open] { padding-bottom: 6px; }
+
+/* Three labelled groups with a hairline between them. Before this the panel was
+   one undivided column of sliders, a switch, a path and six buttons, which is
+   what made it read as cluttered. */
+.advanced .group { padding: 20px 0; }
+.advanced .group + .group { border-top: 1px solid var(--line); }
+.advanced .group > *:first-child { margin-top: 0; }
+.advanced .group > *:last-child { margin-bottom: 0; }
+
+.slider-row { margin-top: 18px; }
+.slider-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.slider-head label { font-weight: 600; font-size: 16px; }
+.slider-head output { color: var(--steady-ink); font-size: 15px; }
+
+.slider-line { display: flex; align-items: center; gap: 14px; }
+
+.step {
+  flex: none;
+  width: 50px; height: 50px;
+  font-size: 24px; line-height: 1;
+  color: var(--ink);
+  background: var(--sunk);
+  border: 0;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.step:hover { background: var(--line); }
+
+input[type=range] {
+  flex: 1; height: 46px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+  height: 10px; border-radius: 5px; background: var(--sunk);
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 32px; height: 32px; margin-top: -11px;
+  border-radius: 50%;
+  background: var(--steady);
+  border: 4px solid var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.help {
+  display: flex; justify-content: space-between; gap: 16px;
+  margin: 8px 0 0; font-size: 13.5px; color: var(--muted);
+}
+
+.group-label {
+  font-size: 14.5px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+  margin: 0 0 4px;
+}
+
+/* Same typography as .switch-label ("Running"), so the two groups read as
+   equals rather than one being a caption. */
+.path {
+  font-family: var(--body);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-all;
+  margin: 0 0 12px;
+}
+
+.diag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+.tag {
+  font-size: 12.5px; font-family: var(--mono);
+  padding: 6px 12px; border-radius: 999px;
+  background: var(--sunk); color: var(--muted);
+}
+
+.tag.ok   { background: var(--steady-soft); color: var(--steady-ink); }
+.tag.warn { background: var(--shake-soft);  color: var(--shake); }
+.tag.bad  { background: var(--shake-soft);  color: var(--shake); }
+
+.warn { color: var(--shake); white-space: pre-wrap; font-size: 13px; }
+
+.row-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* ------------------------------------------------------- small switch row */
+/* Start/Stop was two buttons, which read as two separate actions for what is
+   one piece of state. A switch shows the state AND changes it. Same rectangular
+   language as the theme switch, deliberately unlike the round hero switch -
+   that one pauses, this one closes Tracey. */
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+}
+
+.switch-label { font-size: 16px; font-weight: 600; }
+
+.miniswitch {
+  flex: none;
+  padding: 6px;
+  background: none;
+  border: 0;
+  border-radius: 14px;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.ms-track {
+  display: block;
+  width: 60px; height: 32px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--sunk);
+  box-shadow: inset 0 0 0 2px var(--line);
+  transition: background .2s ease, box-shadow .2s ease;
+}
+
+.ms-knob {
+  display: block;
+  width: 24px; height: 24px;
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform .26s cubic-bezier(.34,1.4,.5,1), background .2s ease;
+}
+
+/* 60 - 4 - 4 - 24 = 28 */
+.miniswitch[aria-checked="true"] .ms-track {
+  background: var(--steady-soft);
+  box-shadow: inset 0 0 0 2px var(--steady);
+}
+.miniswitch[aria-checked="true"] .ms-knob { transform: translateX(28px); background: var(--steady); }
+
+.miniswitch:hover:not([disabled]) .ms-track { box-shadow: inset 0 0 0 2px var(--steady); }
+.miniswitch:active:not([disabled]) .ms-knob { transform: scale(.9); }
+.miniswitch[aria-checked="true"]:active:not([disabled]) .ms-knob { transform: translateX(28px) scale(.9); }
+.miniswitch[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* ---------------------------------------------------------------- buttons */
+
+.soft, .primary {
+  min-height: 48px;
+  padding: 11px 22px;
+  font: inherit; font-size: 16px; font-weight: 600;
+  border: 0; border-radius: 14px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.soft { background: var(--sunk); color: var(--ink); }
+.soft:hover { background: var(--line); }
+
+.primary { background: var(--steady-fill); color: #fff; box-shadow: var(--shadow-sm); }
+.primary:hover { filter: brightness(1.07); }
+.primary:disabled { opacity: .5; cursor: not-allowed; }
+
+html[data-theme="dark"] .primary { color: #06231F; }
+
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: var(--muted); cursor: pointer; }
+.check input { width: 22px; height: 22px; accent-color: var(--steady); cursor: pointer; }
+
+/* ---------------------------------------------------------------- dialogs */
+
+dialog {
+  width: min(620px, 94vw);
+  background: var(--surface);
+  color: var(--ink);
+  border: 0;
+  border-radius: 26px;
+  padding: 30px;
+  box-shadow: var(--shadow-md);
+}
+
+dialog::backdrop { background: rgba(15, 26, 36, .42); backdrop-filter: blur(3px); }
+
+dialog h2 {
+  font-family: var(--display);
+  font-size: 25px; font-weight: 650; letter-spacing: -.02em;
+  margin: 0;
+}
+
+.dialog-sub { margin: 8px 0 20px; color: var(--muted); font-size: 16px; }
+
+.canvas-wrap { position: relative; }
+
+canvas {
+  display: block; width: 100%; height: 280px;
+  background: var(--sunk);
+  border-radius: 18px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* Display only — no crosshair, because there is nothing to draw with. */
+#calCanvas { height: 200px; cursor: default; }
+
+/* A prompt, not a label: it sits on the drawing surface itself, so it should
+   recede the moment the eye lands on the pad. */
+.canvas-hint {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  margin: 0; color: var(--muted); font-size: 13.5px;
+  opacity: .55;
+  pointer-events: none;
+}
+
+/* REQUIRED, not tidiness. `el.hidden = true` hides an element only via the UA
+   stylesheet's `[hidden] { display: none }`, and ANY author `display` beats a UA
+   rule regardless of specificity -- so the `display: grid` above (needed for
+   place-items centring) left both pads' prompts on screen while scribbling. */
+.canvas-hint[hidden] { display: none; }
+
+.pad-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin-top: 14px;
+}
+
+.reduce { margin: 0; font-size: 15px; color: var(--muted); }
+.reduce b { color: var(--steady-ink); font-size: 17px; margin-left: 4px; }
+
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+/* ------------------------------------------------------------- cal steps */
+
+.steps { list-style: none; margin: 20px 0 22px; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+
+.steps li { display: flex; align-items: center; gap: 13px; font-size: 16px; color: var(--muted); }
+
+/* :first-child, so only the NUMBER badge is a circle — the label beside it is a
+   span too, which it has to be for the third step's text to change on finish. */
+.steps li > span:first-child {
+  flex: none; width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--sunk);
+  font-size: 14px; font-weight: 700;
+}
+
+/* `done` reads as fully complete, `on` as in progress. A finished wizard sets
+   step 4, so all three land on `done` — the third step is a thing that HAS
+   happened by then, and leaving it in the paler `on` state read as unfinished. */
+.steps li.on, .steps li.done { color: var(--ink); }
+.steps li.on > span:first-child { background: var(--steady-soft); color: var(--steady-ink); }
+.steps li.done > span:first-child { background: var(--steady); color: #fff; }
+
+.progress {
+  height: 12px; margin-top: 16px;
+  border-radius: 999px; background: var(--sunk); overflow: hidden;
+}
+
+.progress-fill { height: 100%; width: 0%; background: var(--steady); transition: width .2s linear; }
+
+.cal-msg { margin: 16px 0 0; font-size: 16px; color: var(--muted); }
+.cal-result { margin: 10px 0 0; font-size: 24px; font-weight: 650; color: var(--steady-ink); }
+
+/* ----------------------------------------------------------------- narrow */
+
+@media (max-width: 620px) {
+  .choices, .presets { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+
+/* ===================================================== interaction layer */
+/* Motion is feedback, never decoration: every animation answers a touch or
+   a state change, runs 150-400ms, and dies under prefers-reduced-motion. */
+
+.rippled { position: relative; overflow: hidden; }
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--ripple-ink, currentColor);
+  opacity: .14;
+  transform: scale(0);
+  animation: ripple .55s cubic-bezier(.2,.6,.35,1) forwards;
+  pointer-events: none;
+}
+
+.primary .ripple { --ripple-ink: #fff; opacity: .3; }
+.preset .ripple, .card .ripple { --ripple-ink: var(--steady); opacity: .16; }
+
+@keyframes ripple { to { transform: scale(1); opacity: 0; } }
+
+/* cards: lift on hover, seat on press, chevron slides in */
+.card { will-change: transform; }
+.card:hover:not(:disabled) { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.card:active:not(:disabled) { transform: translateY(0) scale(.985); box-shadow: var(--shadow-sm); transition-duration: .07s; }
+
+.card .go {
+  margin-top: auto;
+  align-self: flex-end;
+  font-size: 20px;
+  color: var(--steady-ink);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+.card:hover .go, .card:focus-visible .go { opacity: 1; transform: none; }
+/* visibility, NOT display. The arrow is in normal flow (margin-top:auto pins it
+   to the bottom of the card), so `display:none` removed its box and shrank both
+   cards by 30px. Once the cards became disabled on tablet DISCONNECT, that made
+   the whole page jump every time the pen was unplugged and replugged — and it
+   moved the Advanced summary across the fold, so it fitted only while the cards
+   happened to be disabled. visibility keeps the box and still beats the hover
+   rule above, which is what this needs to do: opacity:1 on a hidden element is
+   still hidden. */
+.card:disabled .go { visibility: hidden; }
+
+/* first-run: the set-up card gently asks to be first */
+.card.attention { animation: beckon 3.2s ease-in-out infinite; }
+@keyframes beckon {
+  0%, 100% { box-shadow: var(--shadow-sm); }
+  50%      { box-shadow: var(--shadow-md), 0 0 0 3px var(--steady-soft); }
+}
+
+/* presets: press seat + check that springs in when chosen */
+.preset { position: relative; }
+.preset:hover:not([aria-pressed="true"]) { border-color: var(--line); }
+.preset:active { transform: scale(.98); }
+
+.preset::after {
+  content: "✓";
+  position: absolute;
+  top: 12px; right: 14px;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--steady-fill);
+  color: #fff;
+  font-size: 13px;
+  transform: scale(0);
+}
+
+.preset[aria-pressed="true"]::after { animation: pop .32s cubic-bezier(.34,1.7,.5,1) forwards; }
+@keyframes pop { to { transform: scale(1); } }
+
+/* soft buttons + steppers: seat on press */
+.soft:active, .primary:active, .step:active { transform: scale(.96); }
+.step { transition: background .15s ease, transform .1s ease; }
+
+/* slider thumb swells while dragging */
+input[type=range]:active::-webkit-slider-thumb { transform: scale(1.18); }
+input[type=range]::-webkit-slider-thumb { transition: transform .12s ease; }
+
+/* hero title changes slide up */
+h1.swap { animation: rise .28s ease-out; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+/* calibration result lands with a pulse ring */
+.cal-result.land { animation: land .5s cubic-bezier(.34,1.5,.5,1); }
+@keyframes land { from { opacity: 0; transform: scale(.9); } }
+
+.progress-fill { background: linear-gradient(90deg, var(--steady), var(--steady-fill)); }
