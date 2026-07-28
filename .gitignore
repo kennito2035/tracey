@@ -20,6 +20,12 @@ ui/build/core/
 # Logs / local runtime files
 *.log
 
+# Python bytecode. src/ ships the four validation analysis scripts, so anyone who
+# runs one leaves a __pycache__ next to the sources; without this it shows up as
+# untracked and can be swept into a commit by a careless `git add -A`.
+__pycache__/
+*.pyc
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db
