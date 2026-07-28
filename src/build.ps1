@@ -71,11 +71,24 @@ if (-not $cert) {
     Write-Host "      Creating self-signed cert $CERT_SUBJECT"
     $cert = New-SelfSignedCertificate -Subject $CERT_SUBJECT -Type CodeSigningCert `
         -KeyUsage DigitalSignature -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(2)
-    foreach ($s in @("Root","TrustedPublisher")) {
-        $store = Get-Item "Cert:\LocalMachine\$s"; $store.Open("ReadWrite"); $store.Add($cert); $store.Close()
-    }
 }
 Write-Host "      Cert thumbprint: $($cert.Thumbprint)"
+
+# Machine trust is re-checked EVERY run, not only when the cert is created. The cert can
+# survive in CurrentUser\My while the LocalMachine stores are cleared -- exactly what
+# happens when the box is stripped for a clean-install test. In that state signtool still
+# signs happily, but step [4/5]'s Get-AuthenticodeSignature returns UnknownError ("root
+# not trusted") and the build dies with nothing pointing at the real cause. Nesting this
+# inside the creation branch made that unrecoverable: the cert exists, so it never ran.
+foreach ($s in @("Root","TrustedPublisher")) {
+    if (Get-ChildItem "Cert:\LocalMachine\$s" | Where-Object { $_.Thumbprint -eq $cert.Thumbprint }) { continue }
+    try {
+        $store = Get-Item "Cert:\LocalMachine\$s"; $store.Open("ReadWrite"); $store.Add($cert); $store.Close()
+        Write-Host "      Trusted cert in LocalMachine\$s" -ForegroundColor Yellow
+    } catch {
+        throw "Cert $($cert.Thumbprint) is NOT trusted in LocalMachine\$s and this shell cannot write there. Re-run build.ps1 from an ELEVATED PowerShell."
+    }
+}
 $kits = @("C:\Program Files (x86)\Windows Kits\10\bin","C:\Program Files\Windows Kits\10\bin")
 $mt = Find-Under $kits "mt.exe" "x64"; if (-not $mt) { throw "mt.exe not found (Windows SDK)." }
 $signtool = Find-Under $kits "signtool.exe" "x64"; if (-not $signtool) { throw "signtool.exe not found (Windows SDK)." }

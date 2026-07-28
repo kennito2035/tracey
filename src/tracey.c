@@ -96,17 +96,22 @@ static unsigned g_cal_an = 0;           /* re-analyse counter during calibration
  *
  * This replaced "keep the strongest peak seen", which sounded robust and was the
  * opposite. Evaluated over the deduplicated Isenkul/Sakar set (61 PD + 15
- * control) with analyze_tremor_detect.py: under 1% of windows produce any peak
- * at all, so picking the strongest single window is a "find me the flukiest
- * window" operator. It fired on 2/15 controls, and on the dev tablet a steady
- * hand got 3.5, then 4, then 10 Hz on consecutive runs.
+ * control) with analyze_tremor_detect.py: only 1.4% of control windows (3.7% PD)
+ * produce any peak at all, so picking the strongest single window is a "find me
+ * the flukiest window" operator. It latches a frequency on 11/15 controls, and on
+ * the dev tablet a steady hand got 3.5, then 4, then 10 Hz on consecutive runs.
  *
- * The peak strength carries no PD/control information either way (AUC 0.564 raw,
- * 0.507 with a high-pass — 0.5 is chance), so the honest output for almost every
- * hand is "no frequency". Requiring the peak in a tenth of the windows and taking
- * the MEDIAN of those gives exactly that, and still reports a real, sustained
- * rhythmic tremor if one is there. Calibration's amplitude path (g_cal_steplen ->
- * preset) is unaffected and is what actually sets the smoothing. */
+ * The peak strength carries no usable PD/control signal as shipped: AUC 0.36–0.40
+ * raw (0.5 is chance, and BELOW 0.5 means the controls actually scored higher). A
+ * 2.5 Hz high-pass ahead of the FFT does lift it to 0.61–0.74 — the detector is
+ * not hopeless, it is unbuilt — but that rests on 15 controls in an offline spiral
+ * task and has never been tried on the live calibration scribble, so nothing here
+ * relies on it (v3+ work). The honest output for almost every hand is therefore
+ * "no frequency". Requiring the peak in a tenth of the windows and taking the
+ * MEDIAN of those gives exactly that (0/15 controls on that set), and still
+ * reports a real, sustained rhythmic tremor if one is there. Calibration's
+ * amplitude path (g_cal_steplen -> preset) is unaffected and is what actually
+ * sets the smoothing. */
 #define CAL_HZ_MAX      512
 #define CAL_HZ_MIN_PCT  10      /* peak must appear in >= this % of windows */
 static double   g_cal_hz_buf[CAL_HZ_MAX];

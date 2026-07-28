@@ -22,8 +22,8 @@ hand shakes when they use a pen** and who wants to keep working independently.
 ## What it does
 - **Smooths pen input in real time**, system-wide: tremor becomes visibly steadier.
 - **Works in every pen/ink app**: it filters input *before* the app sees it.
-- **Calibrates to the individual**, a 5-second test measures your tremor and auto-tunes;
-  live presets (light → heavy) dial it in.
+- **Calibrates to the individual**: a 10-second scribble measures how much your hand actually
+  moves and auto-tunes; live presets (light → heavy) dial it in.
 - **Stays out of the way**: background service; mouse and keyboard untouched, only the pen.
 
 ## How it works
@@ -33,8 +33,10 @@ hand shakes when they use a pen** and who wants to keep working independently.
    low-pass that removes tremor jitter while staying responsive to fast, intentional motion.
    Pressure/tilt pass through untouched.
 3. **Re-inject** the smoothed stroke so the app underneath receives a clean line. A drop-in
-   **Wintab proxy** does the same for legacy-API apps (Photoshop, Clip Studio). A real-time
-   **FFT tremor-frequency tracker** measures the user's tremor for the calibration readout.
+   **Wintab proxy** does the same for legacy-API apps (Photoshop, Clip Studio). An FFT
+   **tremor-frequency tracker** also runs during calibration, but it is *not* in the default
+   filter path and has no user-facing readout: on real patient data it does not reliably
+   identify a tremor frequency. It seeds the experimental `--notch` mode only (see VALIDATION.md).
 
 ## Evidence: validated on real patients
 - **Real hardware** (XP-Pen tablet): the full capture → filter → re-inject pipeline works

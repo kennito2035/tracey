@@ -6,17 +6,17 @@ spiral. So we show it the way tremor papers do: overlay the raw pen path and
 Tracey's path on the SAME axes, and zoom into the shakiest segment.
 
 THE FILTER SETTING MUST BE ONE A USER CAN ACTUALLY PICK. This used to run at
-fmin=0.15 beta=0.012, which is in neither preset table - not exaggerated (measured
-19.9% vs Steadiest's 21.2% in the 4-8 Hz band) but not real either. It now uses the
-UI's Steadiest card verbatim, so the figure shows exactly what clicking Steadiest
-does. Measured on all 61 PD drawings at this setting: 4-8 Hz tremor -21.2%, intended
-motion (<2 Hz) unchanged within 1%, ink trailing the pen by 4.3 px.
+fmin=0.15 beta=0.012, which is in neither preset table - close to Steadiest in
+effect, but not a setting any user can select. It now uses the UI's Steadiest card
+verbatim, so the figure shows exactly what clicking Steadiest does. Measured on all
+61 PD drawings at this setting: 4-8 Hz tremor -19.0%, intended motion (<2 Hz)
+unchanged within 1%, ink trailing the pen by 4.25 px.
 
 Output PNG is committed as a submission asset (data is gitignored; Julian can't regen).
 """
 # The UI's "Steadiest" card, verbatim from ui/electron/core-comms.js PRESETS.
 # NOT the C core's preset 5 (0.15/0.080) - that one is far lighter in practice
-# (10.6% in the 4-8 Hz band), because its high beta lets the cutoff climb with speed.
+# (6.9% in the 4-8 Hz band), because its high beta lets the cutoff climb with speed.
 STEADIEST = (0.22, 0.010)
 import os, glob, hashlib, numpy as np
 import matplotlib
