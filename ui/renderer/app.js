@@ -750,7 +750,8 @@ function resetCal() {
   setStep(1);
 }
 
-/** Put the previous result back on screen: the scribble and the Hz readout. */
+/** Put the previous result back on screen: the scribble and the closing message.
+ *  No frequency: see the note in the status handler. */
 function restoreCal() {
   calRecording = false;
   livePath = lastCal.path;
@@ -758,8 +759,8 @@ function restoreCal() {
   $('calProgress').hidden = false;
   $('calFill').style.width = '100%';
   $('calProgress').setAttribute('aria-valuenow', '100');
-  $('calResult').hidden = !(lastCal.hz > 0);
-  $('calResult').textContent = lastCal.hz > 0 ? shakeText(lastCal.hz) : '';
+  $('calResult').hidden = true;
+  $('calResult').textContent = '';
   $('calMsg').textContent = lastCal.msg;
   $('calRecord').disabled = false;
   $('calRecord').textContent = 'Do it again';
@@ -838,25 +839,26 @@ window.tracey.onCalibration((p) => {
     $('calProgress').setAttribute('aria-valuenow', '100');
     $('calRecord').disabled = false;
     $('calRecord').textContent = 'Do it again';
-    if (p.tremor_hz) {
-      ui.tremorHz = p.tremor_hz;
-      $('calResult').hidden = false;
-      countUp($('calResult'), p.tremor_hz);
-      $('calMsg').textContent = 'Smoothing is now tuned to your hand. Close this and try the practice pad.';
-    } else {
-      // NOT a failure, and it must not read as one. The smoothing is chosen from
-      // the AMPLITUDE of the scribble, which always succeeds; the frequency is a
-      // separate, much weaker measurement that only reports a number when a
-      // steady rhythm persists across the run. On 61 PD + 15 control traces it
-      // stays silent for nearly everyone, so "try scribbling more loosely" was
-      // blaming the user for a limit of the detector.
-      $('calMsg').textContent = 'Smoothing is now tuned to your hand. No steady tremor rhythm stood out, which is common and does not affect the smoothing.';
-    }
-    // Keep the scribble and the reading, so reopening the wizard shows them
-    // again instead of a blank pad. Store the NUMBER, not the on-screen text:
-    // countUp() animates that with requestAnimationFrame, which is throttled
-    // when the window is in the background, so reading it back after a fixed
-    // delay could latch a half-counted value forever.
+    // NO FREQUENCY IS SHOWN, whatever the core measured. Evaluated on 61 PD + 15
+    // control traces the detector carries no usable signal (AUC 0.36-0.40 on the
+    // corrected time base: below 0.5, i.e. controls score HIGHER), and the
+    // persistence threshold that silenced it on that data does not transfer to a
+    // live scribble - a steady hand here produced a peak in 23/127 windows and a
+    // confident 5.93 Hz. Rendering that as "Tracey learned your shake: 5.9 Hz"
+    // told the user something we cannot defend, so the readout is gone.
+    //
+    // ui.tremorHz is still kept: it seeds the practice pad's simulated shake and
+    // the opt-in --notch mode. It is a seed, not a claim.
+    //
+    // The smoothing is chosen from the AMPLITUDE of the scribble, which always
+    // succeeds, so this always reads as success. Never as a failure.
+    if (p.tremor_hz) ui.tremorHz = p.tremor_hz;
+    $('calResult').hidden = true;
+    $('calResult').textContent = '';
+    $('calMsg').textContent = 'Smoothing is now tuned to your hand. Close this and try the practice pad.';
+    // Keep the scribble so reopening the wizard shows it again instead of a
+    // blank pad. hz is still stored, but only so restoreCal() and the practice
+    // pad have the seed; nothing renders it.
     pathOrigin = saneOrigin({ x: winOrigin.x, y: winOrigin.y });
     lastCal = { path: livePath.slice(), msg: $('calMsg').textContent, hz: p.tremor_hz || 0, origin: pathOrigin };
     savePad();                 // survives a full quit, until the next calibration
@@ -1011,30 +1013,6 @@ addRipples('.card, .preset, .primary, .soft, .step');
 // presets render later, so catch them as they appear
 new MutationObserver(() => addRipples('.preset:not(.rippled)'))
   .observe($('presets'), { childList: true });
-
-/** One place that words the reading, so the animation and the restored copy
- *  can never drift apart. */
-function shakeText(hz) {
-  return `Tracey learned your shake: ${hz.toFixed(1)} Hz`;
-}
-
-function countUp(el, target) {
-  el.classList.remove('land');
-  void el.offsetWidth;
-  el.classList.add('land');
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    el.textContent = shakeText(target);
-    return;
-  }
-  const t0 = performance.now();
-  const dur = 700;
-  (function tick(now) {
-    const k = Math.min(1, (now - t0) / dur);
-    const eased = 1 - Math.pow(1 - k, 3);
-    el.textContent = shakeText(target * eased);
-    if (k < 1) requestAnimationFrame(tick);
-  })(t0);
-}
 
 (async () => {
   // The content origin must be known before the calibration pad plots anything,
