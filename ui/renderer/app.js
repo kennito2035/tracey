@@ -149,14 +149,14 @@ function render(s) {
   $('betaOut').textContent = Number(ui.beta).toFixed(4);
   filter.setParams(ui.fmin, ui.beta);
 
-  // No frequency is shown to the user any more. Evaluated on 61 PD + 15 control
-  // traces the RAW detector carries no usable signal (AUC 0.36-0.40 on the
-  // corrected time base - below 0.5, i.e. controls score higher), and the
-  // persistence threshold that silenced it on that data does not transfer to a
-  // gentle calibration scribble at 200 Hz: a steady hand still produced a peak in
-  // 26/71 windows and a confident 6.13 Hz. `tremor_hz` is kept in profile.cfg
-  // because --notch (opt-in, experimental) seeds from it; it is not a claim to
-  // put in front of a user. ui.tremorHz survives only to drive the practice pad's
+  // No frequency is shown to the user. The reasoning lives once, at the
+  // calibration 'done' handler below, so it cannot rot in two places: the short
+  // version is that the SHIPPED detector is above chance (AUC 0.754, 95% CI
+  // 0.644-0.856) and that is still not enough, because an AUC ranks groups
+  // rather than individuals and on the live calibration task it reports a tremor
+  // for 3 of 20 steady hands at a clinical-sounding ~5.2 Hz. `tremor_hz` is kept
+  // in profile.cfg because --notch (opt-in, experimental) seeds from it; it is a
+  // seed, not a claim. ui.tremorHz survives only to drive the practice pad's
   // simulated-shake demo.
 
   renderPresets(s.presets);
@@ -279,9 +279,20 @@ function renderPresets(presets) {
   const pr = ui.state && ui.state.profile;
   const custom = host.querySelector('.preset-custom');
   custom.disabled = !pr;
-  custom.querySelector('span').textContent = pr
-    ? 'Tuned to your own hand'
-    : 'Calibrate first to unlock';
+  /* Name the level calibration chose, rather than saying "tuned to your own hand"
+   * next to a highlighted card holding the identical numbers. The core now picks
+   * from the same three entries as the cards, so the profile always equals one of
+   * them, and two cards claiming to be different settings when they are the same
+   * setting is the confusion this replaces.
+   *
+   * The old wording survives as the fallback, and it is not dead code: a profile
+   * written before the tables were reconciled holds values matching no card. */
+  const chose = pr && presets.find((p) => Math.abs(p.fmin - pr.fmin) < 1e-6 &&
+                                          Math.abs(p.beta - pr.beta) < 1e-9);
+  custom.querySelector('span').textContent =
+    !pr ? 'Calibrate first to unlock'
+    : chose ? `Your calibration chose ${chose.name}`
+    : 'Tuned to your own hand';
   markPreset(matchPreset(presets));
 }
 
@@ -856,13 +867,20 @@ window.tracey.onCalibration((p) => {
     $('calProgress').setAttribute('aria-valuenow', '100');
     $('calRecord').disabled = false;
     $('calRecord').textContent = 'Do it again';
-    // NO FREQUENCY IS SHOWN, whatever the core measured. Evaluated on 61 PD + 15
-    // control traces the detector carries no usable signal (AUC 0.36-0.40 on the
-    // corrected time base: below 0.5, i.e. controls score HIGHER), and the
-    // persistence threshold that silenced it on that data does not transfer to a
-    // live scribble - a steady hand here produced a peak in 23/127 windows and a
-    // confident 5.93 Hz. Rendering that as "Tracey learned your shake: 5.9 Hz"
-    // told the user something we cannot defend, so the readout is gone.
+    // NO FREQUENCY IS SHOWN, whatever the core measured. The reason is NOT that
+    // the detector is useless - it used to be, and that justification is stale.
+    // Before the 2.5 Hz high-pass it scored AUC 0.36-0.40, at or below chance.
+    // The detector that SHIPS scores 0.754 (95% CI 0.644-0.856) on 61 PD + 15
+    // controls, with the whole interval clear of 0.5.
+    //
+    // Two reasons survive that improvement. An AUC ranks two GROUPS: it says a
+    // random patient tends to outscore a random control, and says nothing about
+    // whether one person's reading is their tremor frequency, which is exactly
+    // what a number on this screen would assert. And on THIS task, a free
+    // scribble at ~250 Hz rather than a spiral at 111, it still reports a tremor
+    // for 3 of 20 recordings from a hand that has none, at a clinical-sounding
+    // ~5.2 Hz. Telling a steady-handed person they have a 5.2 Hz tremor is a harm
+    // no amount of ranking accuracy buys back.
     //
     // ui.tremorHz is still kept: it seeds the practice pad's simulated shake and
     // the opt-in --notch mode. It is a seed, not a claim.
