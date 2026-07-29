@@ -5,7 +5,7 @@
  * Scenario B (realistic PD-like, 2D): a drawing path + a dominant low-frequency
  *   drift (~1.5 Hz - the PD component that OVERLAPS intended motion, so it must
  *   NOT be notched) + a smaller separable fast tremor (~3.8 Hz) + noise. Measures
- *   the metric that matters - path-length jitter, the same one the real 115-patient
+ *   the metric that matters - path-length jitter, the same one the real 61-patient
  *   analysis used - plus how much of the accuracy (deviation-from-intent) gap each
  *   filter closes. This is the honest number for a real hand, not the best case.
  *
