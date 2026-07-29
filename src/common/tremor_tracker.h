@@ -20,6 +20,7 @@
 #define TT_FMIN_HZ 3.0        /* tremor search band low edge  */
 #define TT_FMAX_HZ 15.0       /* tremor search band high edge */
 #define TT_MIN_STRENGTH 0.15  /* peak power / total power gate for "real tremor" */
+#define TT_HP_HZ   2.5        /* high-pass ahead of the FFT; 0 disables. See tt_highpass. */
 #ifndef TT_PI
 #define TT_PI 3.14159265358979323846
 #endif
@@ -47,6 +48,50 @@ static void tt_push(TremorTracker *t, double x, double y, double t_s) {
 }
 
 /* --- internals --- */
+/* High-pass by subtracting a moving average, which is what kills the drift the
+ * linear detrend below cannot touch.
+ *
+ * WHY THIS EXISTS. tt_detrend removes only a straight-line ramp, so a curved
+ * scribble leaves a big 1-2 Hz residue whose mainlobe spills into the lowest
+ * in-band bin. Measured consequences, both bad: a steady hand reported a
+ * confident tremor at the floor bin, and - once the floor-shoulder guard
+ * suppressed that - heavy drift made the drift's own shoulder outrank the true
+ * peak, so EVERY genuine 3.2-7 Hz tremor was rejected instead (see the table in
+ * PROGRESS_ANCHOR 6). Windowing cannot fix spill from the adjacent bin; removing
+ * the drift before the transform can.
+ *
+ * Deliberately identical to _lowpass() in analyze_tremor_detect.py - a boxcar of
+ * width fs/(2*fc) with edge-clamped padding - so the offline measurement on 61 PD
+ * + 15 control traces (peak-strength AUC 0.36-0.40 raw, 0.61-0.74 with this)
+ * describes the code that actually runs. If you change the kernel here, that
+ * number stops applying and has to be re-measured.
+ *
+ * NOTE this improves the SEED for --notch and the tracker's sensitivity. It is
+ * NOT licence to show the user a frequency: AUC separates the two GROUPS on a
+ * strength statistic, which is a different claim from "your tremor is X Hz",
+ * and it was never measured on the live calibration task. The UI stays silent.
+ */
+static void tt_highpass(double *a, int n, double fs, double fc) {
+    if (fc <= 0.0 || fs <= 0.0) return;
+    int k = (int)(fs / (2.0 * fc) + 0.5);
+    if (k < 1) k = 1;
+    if (k > n) k = n;                    /* window shorter than the kernel: no-op-ish */
+
+    /* Running mean over a k-wide box, edges clamped to the first/last sample so
+     * the ends are not pulled toward zero and read as a fake step. */
+    double ma[TT_N];
+    double acc = 0.0;
+    for (int i = 0; i < k; i++) acc += a[0];          /* prime with the clamped edge */
+    for (int i = 0; i < n; i++) {
+        int add = i + k / 2;             /* sample entering the window */
+        int rem = i - (k - k / 2);       /* sample leaving it */
+        acc += (add < n ? a[add] : a[n - 1]);
+        acc -= (rem >= 0 ? a[rem] : a[0]);
+        ma[i] = acc / (double)k;
+    }
+    for (int i = 0; i < n; i++) a[i] -= ma[i];
+}
+
 static void tt_detrend(double *a, int n) {
     double sx = 0, sy = 0, sxx = 0, sxy = 0;
     for (int i = 0; i < n; i++) { sx += i; sy += a[i]; sxx += (double)i * i; sxy += (double)i * a[i]; }
@@ -91,6 +136,7 @@ static void tt_analyze(TremorTracker *t) {
         int idx = (t->head + i) % TT_N;
         rex[i] = t->bx[idx]; rey[i] = t->by[idx]; imx[i] = imy[i] = 0.0;
     }
+    tt_highpass(rex, TT_N, fs, TT_HP_HZ); tt_highpass(rey, TT_N, fs, TT_HP_HZ);
     tt_detrend(rex, TT_N); tt_detrend(rey, TT_N);
     for (int i = 0; i < TT_N; i++) {              /* Hann window */
         double w = 0.5 - 0.5 * cos(2.0 * TT_PI * i / (TT_N - 1));
@@ -123,8 +169,28 @@ static void tt_analyze(TremorTracker *t) {
      * construction) is larger, there is no tremor here. tt_detrend removes only a
      * LINEAR ramp, which is why a curved scribble leaves this much behind.
      *
-     * bestk > 1 because pw[0] is never computed; the loop starts at k = 1. */
-    int floor_shoulder = (bestk == kmin && bestk > 1 && pw[bestk - 1] > pw[bestk]);
+     * bestk > 1 because pw[0] is never computed; the loop starts at k = 1.
+     *
+     * WITH THE HIGH-PASS ON, the floor bin is rejected OUTRIGHT, not just when
+     * the bin below is larger. The comparison above is evidence the high-pass
+     * destroys: it attenuates pw[kmin-1] along with the drift, so the shoulder
+     * stops looking like a shoulder and the guard silently stops firing. Measured
+     * consequence, and the reason this clause exists: at fs=200 a pure 2.5 Hz
+     * drift with NO tremor reported a confident 3.00 Hz at every amplitude tried
+     * (20/60/120 px), where the un-high-passed tracker correctly reported 0.00.
+     * That is not academic - the tablet runs at ~200 Hz, and a false seed at the
+     * band floor would point --notch at the user's intended motion and eat
+     * strokes. Wrong seed is worse than no seed.
+     *
+     * The cost is real and accepted: a genuine tremor sitting exactly on the
+     * floor bin is now missed. On the synthetic sweep that is 3.2 Hz at low
+     * drift (which the high-pass had just rescued, at 3.30) plus two detections
+     * at heavy drift that were already >1 Hz off (3.2->4.33, 4.5->3.43). Above
+     * the floor bin the high-pass is a large net win and is kept.
+     *
+     * TT_HP_HZ is a compile-time constant, so this folds away when it is 0. */
+    int floor_shoulder = (bestk == kmin && bestk > 1 &&
+                          (TT_HP_HZ > 0.0 || pw[bestk - 1] > pw[bestk]));
     if (bestk > 0 && !floor_shoulder && total > 0.0 && best / total >= TT_MIN_STRENGTH) {
         /* Parabolic sub-bin refine.
          *
