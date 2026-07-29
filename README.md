@@ -1,6 +1,13 @@
-<img src="ui/assets/icon.png" alt="Tracey" width="120">
+<p align="center">
+  <img src="ui/assets/icon.png" width="140" alt="Tracey, a steadied pen stroke on a rounded teal tile">
+</p>
 
-# Tracey: real-time tremor compensation for pen input
+# Tracey
+### Real-time tremor compensation for pen input on Windows: filter the shake before any app sees it
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Hackathon](https://img.shields.io/badge/Assistive%20Innovation-Challenge%202026-orange.svg)]()
+[![Download](https://img.shields.io/badge/Download-Tracey--Setup--0.1.0.exe-blue.svg)](https://github.com/kennito2035/tracey/releases/latest)
 
 **Tracey makes drawing and handwriting usable again for people with hand tremor, in the
 apps they already use.**

@@ -76,9 +76,14 @@ the wave flattening, the headline text, and the tray icon shape.
 
 No jargon reaches the user. "Your pen is steady", not "filtering active". "Set
 up for my hand", not "calibrate". Presets are Gentle, Balanced and Steadiest,
-with no numbers attached. The words `core`, `fmin`, `beta` and `Hz` appear only
-inside Advanced, except the one Hz reading after calibration, which is the
-moment the app tells you something true about your own body.
+with no numbers attached. The words `core`, `fmin` and `beta` appear only inside
+Advanced. `Hz` appears nowhere in the interface at all: the calibration wizard
+ends on "Smoothing is now tuned to your hand", never on a frequency. A version
+that showed one was built and then removed. Ranking two groups by tremor
+strength is a different claim from handing one person their own number, and on
+the live calibration task the detector still reports a tremor for 3 of 20
+steady hands at a clinical-sounding 5.2 Hz. Telling someone they have a tremor
+they do not have is an accessibility failure, not a feature.
 
 ## Keyboard, screen reader, motion
 
