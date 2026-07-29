@@ -33,7 +33,7 @@ miss-from-intent:
 |---|---|---|
 | mean deviation from intended spiral | 2.7 px | **9.5 px (~3.5x)** |
 | deviation energy in **un-filterable** <2 Hz wander | 91.6% | **92.3%** |
-| one-euro (preset 3) total path-length reduction | 12.9% | 10.0% |
+| one-euro (Balanced) total path-length reduction | 12.9% | 10.0% |
 
 - **The accuracy gap is not filterable.** 92% of a PD spiral's deviation from the intended shape
   lives below 2 Hz - slow wander that overlaps intended motion. No causal filter (low-pass, notch,
@@ -121,12 +121,12 @@ Two deliberately different regimes - the best case and the honest one:
 > test_notch.exe
 === Scenario A: clean separable (0.5 Hz intent + 5 Hz tremor) ===
                         tremor@5Hz kept    intent@0.5Hz kept
-one-euro (preset 3)         88.1%              99.4%
+one-euro (Balanced)         88.1%              99.4%
 adaptive notch              24.4%             100.1%
 
 === Scenario B: realistic PD-like (0.4 Hz draw + 1.5 Hz drift + 3.8 Hz tremor) ===
                     jitter removed   deviation from intended path
-one-euro (preset 3)       0.1%              11.93 px   (raw 11.14)
+one-euro (Balanced)       0.1%              11.93 px   (raw 11.14)
 --notch (notch+1e)        4.9%              12.09 px
 ```
 

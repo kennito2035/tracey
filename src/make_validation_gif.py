@@ -6,9 +6,9 @@ Tracey (right). Motion is the point - the jittering pen tip on the left vs the g
 one on the right sells the tremor removal far better than a still can.
 
 Real data, and a setting the user can actually select: the UI's Steadiest card. This
-used to run at fmin=0.15 beta=0.012, which is in neither preset table. Keep this in
-step with make_validation_figure.py, and with whatever the demo video is filmed at -
-the C core's Ctrl+Alt+5 is NOT this setting and smooths roughly half as much.
+used to run at fmin=0.15 beta=0.012, which was in neither preset table. Keep this in
+step with make_validation_figure.py, and with whatever the demo video is filmed at.
+The core and the UI now share one preset table, so Ctrl+Alt+3 is this setting.
 
 Writes an optimized looping GIF (Pillow, no ffmpeg).
 """

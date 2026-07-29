@@ -65,7 +65,7 @@ static void scenario_a(void) {
     printf("tracker detected tremor: %.2f Hz (true %.1f)\n\n", f_det, f_tremor);
     printf("                        tremor@%.0fHz kept    intent@%.1fHz kept\n", f_tremor, f_intent);
     printf("raw input               %8.1f%%          %8.1f%%\n", 100.0, 100.0);
-    printf("one-euro (preset 3)     %8.1f%%          %8.1f%%\n", 100.0*oe_t/in_t, 100.0*oe_i/in_i);
+    printf("one-euro (Balanced)     %8.1f%%          %8.1f%%\n", 100.0*oe_t/in_t, 100.0*oe_i/in_i);
     printf("adaptive notch          %8.1f%%          %8.1f%%\n", 100.0*nz_t/in_t, 100.0*nz_i/in_i);
     printf("(lower tremor%% = more shake removed; higher intent%% = intended motion preserved)\n\n");
 }
@@ -113,7 +113,7 @@ static void scenario_b(void) {
     printf("3 Hz band and is left intact (notching it would eat intended motion).\n\n");
     printf("                    jitter removed   deviation from intended path\n");
     printf("raw input                  --             %6.2f px\n", raw_dev);
-    printf("one-euro (preset 3)   %7.1f%%             %6.2f px\n", 100.0*(raw_len-oe_len)/raw_len, oe_dev);
+    printf("one-euro (Balanced)   %7.1f%%             %6.2f px\n", 100.0*(raw_len-oe_len)/raw_len, oe_dev);
     printf("--notch (notch+1e)    %7.1f%%             %6.2f px\n", 100.0*(raw_len-ne_len)/raw_len, ne_dev);
     printf("(jitter = path length, the real-data metric; deviation = RMS distance from the true stroke)\n");
 }

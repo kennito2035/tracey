@@ -15,9 +15,11 @@ unchanged within 1%, ink trailing the pen by 4.25 px.
 Output PNG is committed as a submission asset (the dataset is gitignored, so it cannot be
 regenerated without restoring it first).
 """
-# The UI's "Steadiest" card, verbatim from ui/electron/core-comms.js PRESETS.
-# NOT the C core's preset 5 (0.15/0.080) - that one is far lighter in practice
-# (6.9% in the 4-8 Hz band), because its high beta lets the cutoff climb with speed.
+# The "Steadiest" setting, verbatim from ui/electron/core-comms.js PRESETS. The C core
+# ships the same three presets now (tracey.c PRESETS, Ctrl+Alt+3), so this is one number
+# in one place. It used to be two: the core's old preset 5 (0.15/0.080) was far lighter
+# in practice, 6.9% in the 4-8 Hz band, because its high beta let the cutoff climb with
+# speed. That table is gone.
 STEADIEST = (0.22, 0.010)
 import os, glob, hashlib, numpy as np
 import matplotlib
