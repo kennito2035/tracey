@@ -1,3 +1,5 @@
+<img src="ui/assets/icon.png" alt="Tracey" width="120">
+
 # Tracey: real-time tremor compensation for pen input
 
 **Tracey makes drawing and handwriting usable again for people with hand tremor, in the
