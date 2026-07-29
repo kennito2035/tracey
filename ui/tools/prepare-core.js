@@ -60,6 +60,10 @@ if (!fs.existsSync(cer)) {
 // a perfectly good, properly signed core. Trust is the INSTALLER's job to
 // establish on the target machine; the build only has to ship a signed binary.
 // Rejected: NotSigned (no signature) and HashMismatch (tampered or truncated).
+// Reported verbatim in the summary below. Hardcoding "signature Valid" there meant
+// this script could warn that the status was UnknownError and then print "Valid" on
+// the very next line, which is worse than printing nothing.
+let sigStatus = 'not checked (non-Windows)';
 if (process.platform === 'win32') {
   let status = 'unknown', signer = '';
   try {
@@ -82,6 +86,7 @@ if (process.platform === 'win32') {
                 `signed by ${signer}, this PC just does not trust that certificate right now. ` +
                 'Packaging anyway; the installer establishes trust on the target machine.');
   }
+  sigStatus = status;
 }
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -89,5 +94,5 @@ fs.copyFileSync(exe, path.join(OUT, 'tracey.exe'));
 fs.copyFileSync(cer, path.join(OUT, 'TraceyDevSigning.cer'));
 
 console.log('prepare-core: staged from ' + dir);
-console.log('  tracey.exe              ' + fs.statSync(path.join(OUT, 'tracey.exe')).size + ' bytes, signature Valid');
+console.log('  tracey.exe              ' + fs.statSync(path.join(OUT, 'tracey.exe')).size + ' bytes, signature ' + sigStatus);
 console.log('  TraceyDevSigning.cer    ' + fs.statSync(path.join(OUT, 'TraceyDevSigning.cer')).size + ' bytes');
