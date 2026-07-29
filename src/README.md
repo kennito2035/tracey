@@ -50,7 +50,10 @@ the jitter, validated above), **not** "straightens intent". See the parked-work 
 `tremor_tracker.h` (header-only C, no dependencies beyond libm):
 
 1. Buffers a sliding window of recent pen positions (128 samples, ~0.85 s at 150 Hz).
-2. Linear-detrends the window (removes slow intended motion), applies a Hann window.
+2. High-passes at 2.5 Hz (`TT_HP_HZ`), then linear-detrends the window (removes slow
+   intended motion) and applies a Hann window. The high-pass matters because detrending
+   removes only a straight-line ramp, so a *curved* scribble leaves a 1-2 Hz residue whose
+   mainlobe spills into the lowest in-band bin and is read as tremor.
 3. Runs a small radix-2 FFT on both axes, sums the power spectra, and finds the dominant
    bin in the tremor band (3-15 Hz), with parabolic interpolation for sub-bin accuracy.
 4. Gates on peak strength so a steady hand reports **freq = 0** (no false tremor).
@@ -61,9 +64,9 @@ the jitter, validated above), **not** "straightens intent". See the parked-work 
 
 ```
 > test_tracker.exe
-5 Hz tremor    -> freq=4.87 Hz strength=0.31  [PASS]
-6 Hz tremor    -> freq=5.93 Hz strength=0.35  [PASS]
-9 Hz tremor    -> freq=9.13 Hz strength=0.20  [PASS]
+5 Hz tremor    -> freq=4.87 Hz strength=0.60  [PASS]
+6 Hz tremor    -> freq=5.93 Hz strength=0.65  [PASS]
+9 Hz tremor    -> freq=9.12 Hz strength=0.58  [PASS]
 no tremor      -> freq=0.00 Hz strength=0.00  [PASS]
 ```
 
@@ -114,7 +117,7 @@ Two deliberately different regimes - the best case and the honest one:
 === Scenario A: clean separable (0.5 Hz intent + 5 Hz tremor) ===
                         tremor@5Hz kept    intent@0.5Hz kept
 one-euro (preset 3)         88.1%              99.4%
-adaptive notch              24.8%             100.1%
+adaptive notch              24.4%             100.1%
 
 === Scenario B: realistic PD-like (0.4 Hz draw + 1.5 Hz drift + 3.8 Hz tremor) ===
                     jitter removed   deviation from intended path
