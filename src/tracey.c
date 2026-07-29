@@ -754,40 +754,75 @@ static void finish_calibration(HWND hwnd) {
         return;
     }
     double J = g_cal_steplen / g_cal_count;
-    /* Map the measured deviation onto the three cards. The 3.0 and 5.0 px edges
-     * are the middle band of the old five-bucket scale, kept exactly, so the one
-     * bucket that already meant Balanced still does; the two lighter buckets
-     * collapse into Gentle and the two heavier into Steadiest, and 0.70 / 0.22
-     * sit inside the ranges they replace. UNCHANGED CAVEAT: these thresholds are
-     * validated only on a steady, non-tremor hand. A real tremor user is still
-     * needed to tune them. */
-    int preset;
-    if      (J < 3.0) preset = 0;   /* Gentle */
-    else if (J < 5.0) preset = 1;   /* Balanced */
-    else              preset = 2;   /* Steadiest */
-    double fmin = PRESETS[preset].fmin, beta = PRESETS[preset].beta;
+    /* INTERPOLATE between the three validated presets. Do NOT snap to one.
+     *
+     * Snapping made calibration's output byte-identical to a card every time,
+     * which turned the UI's "Custom" card into a provable no-op: clicking it
+     * wrote values that were already live, the core saw no change so it kept
+     * publishing a NAMED preset id, and the highlight snapped back inside 200 ms.
+     * Two separate attempts to fix that in the renderer each traded one wrong
+     * highlight for another, because the ambiguity was in the data, not the view.
+     * A genuinely per-user value removes the class instead of the symptom, and it
+     * is what "calibrates to the individual" ought to mean in the first place.
+     *
+     * Anchors are the three cards at J = 2, 4, 6 px, so the midpoints between
+     * them fall on 3 and 5, exactly where the old buckets switched. The result is
+     * clamped, so it can never leave the validated Gentle..Steadiest span; a very
+     * steady or very shaky hand lands exactly ON an endpoint, and that is fine,
+     * because `g_preset = -1` below is what keeps Custom selectable, not the
+     * values being distinct.
+     *
+     * UNCHANGED CAVEAT: the J scale is validated only on a steady, non-tremor
+     * hand. Interpolating between validated endpoints is not a stronger claim
+     * than the buckets were, only a continuous one. A real tremor user is still
+     * needed to place these numbers properly. */
+    static const double CAL_ANCHOR_J[3] = { 2.0, 4.0, 6.0 };
+    int seg = (J < CAL_ANCHOR_J[1]) ? 0 : 1;
+    double t = (J - CAL_ANCHOR_J[seg]) / (CAL_ANCHOR_J[seg + 1] - CAL_ANCHOR_J[seg]);
+    if (t < 0.0) t = 0.0;
+    if (t > 1.0) t = 1.0;
+    double fmin = PRESETS[seg].fmin + t * (PRESETS[seg + 1].fmin - PRESETS[seg].fmin);
+    double beta = PRESETS[seg].beta + t * (PRESETS[seg + 1].beta - PRESETS[seg].beta);
+
     cal_window();                 /* the final window counts like any other */
     double hz = cal_tremor_hz();  /* 0 unless a peak PERSISTED across the run */
-    save_profile(fmin, beta, preset, hz);        /* hz seeds the --notch center freq */
-    g_cur_fmin = fmin; g_cur_beta = beta; g_preset = preset;
+    /* preset = -1 means "calibrated, not a named preset". That is what makes
+     * write_status publish preset=0, the id the UI reserves for Custom, so an
+     * explicit Custom click holds instead of being overridden on the next push. */
+    save_profile(fmin, beta, -1, hz);            /* hz seeds the --notch center freq */
+    g_cur_fmin = fmin; g_cur_beta = beta; g_preset = -1;
     LOGF("calibrate J=%.2f count=%u hz=%.2f (peak in %d/%u windows, need %d%%) "
-         "-> preset=%d fmin=%.2f beta=%.4f (saved)\n",
+         "-> calibrated fmin=%.3f beta=%.4f (saved, %s..%s at t=%.2f)\n",
          J, g_cal_count, hz, g_cal_hz_n, g_cal_win, CAL_HZ_MIN_PCT,
-         preset + 1, fmin, beta);
+         fmin, beta, seg == 0 ? "Gentle" : "Balanced",
+         seg == 0 ? "Balanced" : "Steadiest", t);
 
     /* Live core: adopt the profile we just measured and resume filtering. No
      * dialog, no exit, no relaunch - so no second UAC prompt. */
     if (g_calibrating) { end_inproc_calibration(hz); return; }
 
+    /* NO FREQUENCY IN THIS DIALOG. It used to print "Tremor detected: X.X Hz",
+     * which is precisely the readout the product decided never to show a user.
+     * The UI wizard has never shown it, so the standing claim that "there is no
+     * tremor-detected screen" was true of the GUI and false of this standalone
+     * --calibrate path, which the READMEs document and anyone can run.
+     *
+     * The reason is unchanged by the detector having improved: it ranks GROUPS
+     * above chance (AUC 0.754, 95% CI 0.644-0.856) but on this task still reports
+     * a tremor for 3 of 20 recordings from a hand that has none, at a
+     * clinical-sounding ~5.2 Hz. `hz` is still measured and saved, because it
+     * seeds --notch. It is a seed, not a claim to put in front of a person.
+     *
+     * wsprintfW has no %f, hence the integer decomposition. */
     wchar_t b[520];
     wsprintfW(b,
         L"Calibration complete.\n\n"
-        L"Tremor detected: %d.%01d Hz\n"
         L"Measured amplitude: %d.%02d px (%u samples).\n"
-        L"Chosen smoothing: preset %d of 5.\n\n"
+        L"Chosen smoothing: fmin %d.%03d, beta %d.%04d.\n\n"
         L"Saved. Normal launches now use this profile automatically.",
-        (int)hz, (int)((hz - (int)hz) * 10 + 0.5),
-        (int)J, (int)((J - (int)J) * 100 + 0.5), g_cal_count, preset + 1);
+        (int)J, (int)((J - (int)J) * 100 + 0.5), g_cal_count,
+        (int)fmin, (int)((fmin - (int)fmin) * 1000 + 0.5),
+        (int)beta, (int)((beta - (int)beta) * 10000 + 0.5));
     if (!g_noprompt)
         MessageBoxW(NULL, b, L"Tracey - calibration", MB_OK | MB_ICONINFORMATION);
     /* Publish running=0 only now, AFTER any dialog: this process still holds the
