@@ -156,24 +156,45 @@ permission to steady your pen when it runs from a protected folder."
   SetShellVarContext all
   Delete "$DESKTOP\${SHORTCUT_NAME}.lnk"
 
-  ; ASK before removing the settings folder, and default to KEEPING it.
-  ; %PROGRAMDATA%\Tracey holds profile.cfg - the calibration the user scribbled
-  ; ten seconds for - plus their smoothing settings. Deleting it silently would
-  ; make a reinstall cost them that work, and keeping it silently gives someone
-  ; who wanted a clean slate no way to get one. So: ask.
+  ; ASK before removing the user's data, and default to KEEPING it.
+  ; Deleting it silently would make a reinstall cost them the calibration they
+  ; scribbled ten seconds for, and keeping it silently gives someone who wanted
+  ; a clean slate no way to get one. So: ask.
+  ;
+  ; THERE ARE TWO FOLDERS, and missing the second one is a privacy bug, not an
+  ; inconvenience:
+  ;   %PROGRAMDATA%\Tracey    - profile.cfg (the calibration) + settings. This is
+  ;                             $APPDATA here, because SetShellVarContext all is
+  ;                             in force from the shortcut cleanup above.
+  ;   %APPDATA%\tracey-ui     - Electron's userData: pad-state.json, which holds
+  ;                             the actual PEN STROKES the user drew on the
+  ;                             calibration and practice pads. Folder is named
+  ;                             for package.json `name`, NOT productName.
+  ;
+  ; Only the first was ever deleted. A user who answered Yes was told "including
+  ; the calibration you recorded" and still had their handwriting left on disk,
+  ; and on reinstall the pads came back covered in it while Custom sat locked -
+  ; because the profile was gone but the strokes were not. Reading $APPDATA needs
+  ; the CURRENT-user context, so flip it and flip it straight back: everything
+  ; after this block (the note about $INSTDIR) still assumes all-users.
+  ;
   ; ${Silent} guard is load-bearing - a MessageBox in a silent uninstall waits
   ; forever on a dialog nobody can see, which reads as a hung uninstaller.
   ; Silent keeps the data, matching the default of the visible prompt.
   ${IfNot} ${Silent}
     MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 \
-      "Also delete your Tracey settings and calibration?$\r$\n$\r$\nThis removes $APPDATA\Tracey, including the calibration you recorded. Choose No to keep them for a future reinstall." \
+      "Also delete your Tracey settings and calibration?$\r$\n$\r$\nThis removes your calibration, your smoothing settings, and the pen strokes saved on the calibration and practice pads. Choose No to keep them for a future reinstall." \
       IDYES traceyWipeData IDNO traceyKeepData
     traceyWipeData:
       DetailPrint "Deleting settings and calibration: $APPDATA\Tracey"
       RMDir /r "$APPDATA\Tracey"
+      SetShellVarContext current
+      DetailPrint "Deleting saved pen strokes: $APPDATA\tracey-ui"
+      RMDir /r "$APPDATA\tracey-ui"
+      SetShellVarContext all
       Goto traceyDataDone
     traceyKeepData:
-      DetailPrint "Keeping settings and calibration: $APPDATA\Tracey"
+      DetailPrint "Keeping settings, calibration and saved pen strokes"
     traceyDataDone:
   ${EndIf}
 
