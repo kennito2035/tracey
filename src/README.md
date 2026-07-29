@@ -16,7 +16,8 @@ learning that needs real tremor data".
 
 ## Findings from real Parkinson's data
 
-Isenkul/Sakar spiral dataset (Wacom tablet, pen X/Y @ ~111-143 Hz; tests SST/DST/STCP). Data is
+Isenkul/Sakar spiral dataset (Wacom Cintiq 12WX; pen X/Y at either 111 Hz or 143 Hz per recording,
+26 of 76 slower and 50 faster, nothing between; tests SST/DST/STCP). Data is
 gitignored (`v3/data/`) but the analysis is reproducible - run `python v3/analyze_spirals.py`.
 The "Improved Spiral Test" folder is a **duplicate** of the Isenkul set and is excluded outright.
 A content hash is NOT sufficient: five of its "Healthy" files are the same five control subjects'

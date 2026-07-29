@@ -20,7 +20,9 @@ intended path, preserved (not straightened).*
 
 ## The data
 The [Isenkul/Sakar Parkinson spiral dataset](https://archive.ics.uci.edu/dataset/395/parkinson+disease+spiral+drawings+using+digitized+graphics+tablet)
-(digitizing tablet, pen X/Y at ~110–143 Hz). Patients trace a printed Archimedean spiral, a
+(digitizing tablet; pen X/Y sampled at either **111 Hz or 143 Hz** depending on the recording:
+26 of the 76 drawings use the slower clock and 50 the faster, with nothing in between). Patients
+trace a printed Archimedean spiral, a
 standard clinical test for hand tremor. The download ships an "Improved Spiral Test" folder that is
 a second copy of the base set, so we exclude it, and hashing alone is not enough to catch it, since
 five of its "Healthy" files are the same five control subjects' same drawings with a few extra

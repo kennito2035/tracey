@@ -40,8 +40,9 @@ hand shakes when they use a pen** and who wants to keep working independently.
   end-to-end in real apps, verified in **Microsoft Paint and Adobe Photoshop**. Photoshop is
   the case that matters most: it takes the pen through Windows Ink like everything else, so
   it needs nothing special from us.
-- **61 Parkinson's patients + 15 controls** (public spiral-drawing dataset, pen X/Y ~110–140 Hz;
-  deduplicated): Parkinson's tremor is **~3× a steady hand's** deviation, and Tracey removes
+- **61 Parkinson's patients + 15 controls** (public spiral-drawing dataset, pen X/Y at either 111
+  or 143 Hz depending on the recording; the archive's duplicate folder excluded, not merely
+  hashed): Parkinson's tremor is **~3.5× a steady hand's** deviation, and Tracey removes
   **~10% of stroke jitter**, the visible shake. We also measured, honestly, what it *can't* do:
   it does **not** correct large-scale drift (92% of it is <2 Hz and overlaps intended motion:
   an intent model, not a filter; see Roadmap). **→ [VALIDATION.md](VALIDATION.md)** for the
