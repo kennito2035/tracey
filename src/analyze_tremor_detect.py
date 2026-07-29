@@ -99,7 +99,21 @@ def tt_analyze(bx, by, fs, floor_guard=True, highpass=None):
     bestk = kmin + int(np.argmax(band))
     best = pw[bestk]
 
-    if floor_guard and bestk == kmin and bestk > 1 and pw[bestk - 1] > pw[bestk]:
+    # Floor-shoulder guard. Mirrors tremor_tracker.h:192-193 EXACTLY, INCLUDING the
+    # high-pass clause added in PROGRESS_ANCHOR 8f:
+    #     bestk == kmin && bestk > 1 && (TT_HP_HZ > 0.0 || pw[bestk-1] > pw[bestk])
+    # With the high-pass on, the floor bin is rejected OUTRIGHT rather than only when
+    # the bin below is larger - because the high-pass attenuates pw[kmin-1] along with
+    # the drift, so the shoulder stops looking like a shoulder and the comparison
+    # silently stops firing. `highpass is not None` is the runtime equivalent of the C
+    # compile-time constant TT_HP_HZ > 0.
+    #
+    # This clause was MISSING here from 2026-07-29 until it was caught by the live
+    # 250 Hz recordings: without it this script accepts floor-bin peaks the shipped
+    # core rejects, so every number it printed for the high-pass case described an
+    # algorithm that does not ship.
+    if (floor_guard and bestk == kmin and bestk > 1
+            and (highpass is not None or pw[bestk - 1] > pw[bestk])):
         return 0.0, 0.0
     if best / total < TT_MIN_STRENGTH:
         return 0.0, 0.0
