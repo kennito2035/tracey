@@ -49,7 +49,7 @@ hand shakes when they use a pen** and who wants to keep working independently.
   end-to-end in real apps, verified in **Microsoft Paint and Adobe Photoshop**. Photoshop is
   the case that matters most: it takes the pen through Windows Ink like everything else, so
   it needs nothing special from us.
-- **61 Parkinson's patients + 15 controls** (public spiral-drawing dataset, pen X/Y at either 111
+- **61 Parkinson's patients + 15 controls** ([UCI Parkinson disease spiral drawings](https://archive.ics.uci.edu/dataset/395/parkinson+disease+spiral+drawings+using+digitized+graphics+tablet), pen X/Y at either 111
   or 143 Hz depending on the recording; the archive's duplicate folder excluded, not merely
   hashed): Parkinson's tremor is **~3.5× a steady hand's** deviation, and Tracey removes
   **~10% of stroke jitter**, the visible shake. We also measured, honestly, what it *can't* do:
@@ -141,4 +141,5 @@ LICENSE              MIT
 
 ## Credits
 Built for the Assistive Innovation Challenge 2026. One-euro filter: Casiez, Roussel & Vogel
-(2012). Validation used public Parkinson's spiral-drawing datasets (Isenkul, Sakar et al.), for measurement only; no dataset is redistributed here.
+(2012). Validation used the [UCI Parkinson disease spiral drawings dataset](https://archive.ics.uci.edu/dataset/395/parkinson+disease+spiral+drawings+using+digitized+graphics+tablet)
+(Isenkul, Sakar & Sakar, 2014), for measurement only; no dataset is redistributed here.

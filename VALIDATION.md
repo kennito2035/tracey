@@ -120,7 +120,8 @@ actually infer. Claiming otherwise would be a lie a clinician would catch in fiv
 
 ## Reproduce it
 Everything above regenerates from the raw data with two scripts in the repo (need `numpy` +
-`matplotlib`; drop the UCI dataset into `src/data/` first; it's redistributable but gitignored):
+`matplotlib`; drop the [UCI dataset](https://archive.ics.uci.edu/dataset/395/parkinson+disease+spiral+drawings+using+digitized+graphics+tablet)
+into `src/data/` first; it's redistributable but gitignored):
 ```
 python src/analyze_spirals.py         # the numbers (dedup, deviation, filterability)
 python src/make_validation_figure.py  # the static before/after + zoom

@@ -16,9 +16,10 @@ learning that needs real tremor data".
 
 ## Findings from real Parkinson's data
 
-Isenkul/Sakar spiral dataset (Wacom Cintiq 12WX; pen X/Y at either 111 Hz or 143 Hz per recording,
+[Isenkul/Sakar spiral dataset](https://archive.ics.uci.edu/dataset/395/parkinson+disease+spiral+drawings+using+digitized+graphics+tablet)
+(Wacom Cintiq 12WX; pen X/Y at either 111 Hz or 143 Hz per recording,
 26 of 76 slower and 50 faster, nothing between; tests SST/DST/STCP). Data is
-gitignored (`v3/data/`) but the analysis is reproducible - run `python v3/analyze_spirals.py`.
+gitignored (`src/data/`) but the analysis is reproducible - run `python src/analyze_spirals.py`.
 The "Improved Spiral Test" folder is a **duplicate** of the Isenkul set and is excluded outright.
 A content hash is NOT sufficient: five of its "Healthy" files are the same five control subjects'
 same drawings with a few extra trailing samples, so they survive hashing and inflate the control
@@ -168,4 +169,4 @@ exists:
   tremor and store per-type parameters (the notch already leans on the calibrated frequency).
 
 Bottom line for the product: claim **"reduces tremor shake"** (true, validated), not "straightens
-intent". The reproducible analysis lives in `v3/analyze_spirals.py`.
+intent". The reproducible analysis lives in `src/analyze_spirals.py`.
