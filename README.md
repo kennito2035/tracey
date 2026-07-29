@@ -79,8 +79,9 @@ certificate again**. Uninstalling also asks whether to keep your settings and ca
 SmartScreen will say the publisher is unknown, because the installer is not commercially signed.
 Choose **More info → Run anyway**.
 
-Then open Tracey, turn it on, and draw in any app. `Ctrl+Alt+1..5` sets smoothing strength
-and `Ctrl+Alt+Q` quits, from anywhere.
+Then open Tracey, turn it on, and draw in any app. `Ctrl+Alt+1`, `Ctrl+Alt+2` and
+`Ctrl+Alt+3` select Gentle, Balanced and Steadiest, the same three cards the window shows,
+and `Ctrl+Alt+Q` stops the filter. All from anywhere.
 
 If the core will not start, Windows 11's **Smart App Control** may be blocking it (the build
 is self-signed). Turn it off under Windows Security → App & browser control → Smart App

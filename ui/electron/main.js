@@ -132,6 +132,22 @@ function ensureTray(wanted) {
   } else if (!wanted && tray) {
     tray.destroy();
     tray = null;
+    /* The window may already be HIDDEN at this point, and then destroying the
+     * icon strands the app: no window, no tray, process still alive. `close`
+     * only hides while a tray exists, so "close the window, then stop the core"
+     * (Ctrl+Alt+Q does exactly that) reaches it. It is the same state
+     * `window-all-closed` guards against below, and that guard cannot fire,
+     * because hiding is not closing and the event never runs.
+     *
+     * The invariant is that this app always keeps ONE visible affordance, a
+     * window or an icon. Restore the window rather than leave a ghost that only
+     * Task Manager can reach.
+     *
+     * Not during a quit: shutdown() stops the core, which lands right here, and
+     * popping the window open while the user is quitting would be worse than
+     * the bug. */
+    if (!quitting && !shuttingDown &&
+        win && !win.isDestroyed() && !win.isVisible()) showWindow();
   }
 }
 
@@ -293,7 +309,7 @@ function createWindow() {
  * Three sources, and the ORDER depends on whether a core is alive:
  *
  *   core running -> status.cfg first. It is the live truth; the core may have
- *                   been retuned by a Ctrl+Alt+1..5 hotkey that config.cfg
+ *                   been retuned by a Ctrl+Alt+1..3 hotkey that config.cfg
  *                   never saw (apply_preset publishes to status only).
  *   no core      -> config.cfg first. It is what the NEXT core will start from,
  *                   it survives an uninstall, and a status.cfg left behind by a

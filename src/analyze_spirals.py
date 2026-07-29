@@ -261,11 +261,13 @@ for grp, pats in GROUPS.items():
 print("\n" + "=" * 78)
 print("Pushing harder: PD 4-8 Hz reduction vs the lag it costs")
 print("=" * 78)
-# core preset 5 is in here on purpose: it is what Ctrl+Alt+5 selects, and it is
-# NOT the same as the UI's Steadiest card. The demo has to be filmed on the card,
-# and the size of that difference is the reason.
+# The "removed p5" row is kept on purpose: it is what the core's old Ctrl+Alt+5
+# selected, and this measurement is why that hotkey scale is gone. It removed
+# 6.9% of the 4-8 Hz band against Steadiest's 19.0%, so the strongest-LOOKING
+# setting was the weakest one. The core now ships the same three presets as the
+# UI cards above it. Kept as the evidence, not as a shipping setting.
 SETTINGS = [("Gentle    ", 0.70, 0.050), ("Balanced  ", 0.40, 0.020),
-            ("Steadiest ", 0.22, 0.010), ("core p5   ", 0.15, 0.080),
+            ("Steadiest ", 0.22, 0.010), ("removed p5", 0.15, 0.080),
             ("heavy-1   ", 0.15, 0.005),
             ("heavy-2   ", 0.10, 0.002), ("heavy-3   ", 0.07, 0.001)]
 files = unique_files(GROUPS["parkinson"])

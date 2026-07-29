@@ -48,18 +48,20 @@
 
 typedef struct { const char *name; double fmin, beta; } Setting;
 
-/* The five core presets (Ctrl+Alt+1..5, tracey.c) then the three UI cards
- * (core-comms.js). The UI cards are what a user actually picks, so they are the
- * ones to quote; the hotkey presets are a different table and NOT the same. */
+/* The three settings, which are now ONE table shared by the core (tracey.c
+ * PRESETS, selected by Ctrl+Alt+1..3) and the UI (core-comms.js PRESETS).
+ *
+ * This file used to list eight rows, because the core carried a separate
+ * five-step scale that shared only its middle entry with the UI's cards. The
+ * comment here said outright that they were "a different table and NOT the
+ * same", which was true and was the bug: four of the five hotkeys set values no
+ * card could represent, and the one labelled "5 heavy" was the WEAKEST of the
+ * lot on tremor (6.9% of the 4-8 Hz band against Steadiest's 19.0%). Reconciled
+ * 2026-07-29. If these two tables ever diverge again, that is a bug. */
 static const Setting SETTINGS[] = {
-    { "core preset 1 (light)",  1.00, 0.007 },
-    { "core preset 2",          0.60, 0.012 },
-    { "core preset 3 (default)",0.40, 0.020 },
-    { "core preset 4",          0.25, 0.040 },
-    { "core preset 5 (heavy)",  0.15, 0.080 },
-    { "UI card: Gentle",        0.70, 0.050 },
-    { "UI card: Balanced",      0.40, 0.020 },
-    { "UI card: Steadiest",     0.22, 0.010 },
+    { "Gentle",    0.70, 0.050 },
+    { "Balanced",  0.40, 0.020 },
+    { "Steadiest", 0.22, 0.010 },
 };
 #define NSET (int)(sizeof(SETTINGS)/sizeof(SETTINGS[0]))
 

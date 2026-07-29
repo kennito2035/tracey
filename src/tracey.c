@@ -9,8 +9,8 @@
  * uiAccess Python process dies in the loader, which is why this is native C.
  *
  * Modes (launch arg; env vars do not survive the UAC/AppInfo boundary):
- *   (default)     filter mode. Loads profile.cfg if present, else preset 3.
- *                 Ctrl+Alt+1..5 change smoothing live; Ctrl+Alt+Q quits.
+ *   (default)     filter mode. Loads profile.cfg if present, else Balanced.
+ *                 Ctrl+Alt+1..3 change smoothing live; Ctrl+Alt+Q stops this core.
  *                 A running core also calibrates IN-PROCESS on config.cfg
  *                 calibrate=1 -- see below; that is how the UI does it.
  *   --calibrate   measure action tremor for 10 s and save a smoothing profile,
@@ -121,16 +121,24 @@ static void     cal_window(void);        /* defined after calib_sample, used by 
 static double   cal_tremor_hz(void);
 
 /* Smoothing presets: lower fmin = more smoothing at rest; higher beta keeps
- * fast intentional motion responsive. Ctrl+Alt+1..5 select these live. */
+ * fast intentional motion responsive. Ctrl+Alt+1..3 select these live.
+ *
+ * These are EXACTLY the UI's three cards (ui/electron/core-comms.js PRESETS) and
+ * must stay that way. There used to be a five-step scale here that shared only
+ * its middle entry with the UI, so four of the five hotkeys put the core on
+ * values no card could represent and the UI showed no selection at all. Worse,
+ * the old "5 heavy" raised beta to 0.080, which makes the filter yield to motion
+ * FASTER: measured across 61 patients it removed 6.9% of the 4-8 Hz band against
+ * Steadiest's 19.0%, so the strongest-looking hotkey was the weakest setting.
+ * Index i is published as preset=i+1, which is the UI's card id, and -1 -> 0 is
+ * the id the UI reserves for "custom". */
 typedef struct { double fmin, beta; } Preset;
-static const Preset PRESETS[5] = {
-    {1.00, 0.007},   /* 1 light */
-    {0.60, 0.012},   /* 2 */
-    {0.40, 0.020},   /* 3 */
-    {0.25, 0.040},   /* 4 */
-    {0.15, 0.080},   /* 5 heavy */
+static const Preset PRESETS[3] = {
+    {0.70, 0.050},   /* 1 Gentle */
+    {0.40, 0.020},   /* 2 Balanced (default) */
+    {0.22, 0.010},   /* 3 Steadiest */
 };
-static int    g_preset   = 2;      /* index; -1 means calibrated/custom (profile or UI) */
+static int    g_preset   = 1;      /* index; -1 means calibrated/custom (profile or UI) */
 static double g_dcut     = 1.0;
 static double g_cur_fmin = 0.40, g_cur_beta = 0.020;
 
@@ -459,7 +467,7 @@ static void stat_update(int rx, int ry, int fx, int fy) {
 }
 
 static void apply_preset(int i) {
-    if (i < 0 || i > 4) return;
+    if (i < 0 || i > 2) return;
     g_preset = i;
     g_cur_fmin = PRESETS[i].fmin; g_cur_beta = PRESETS[i].beta;
     oneeuro_init(&g_fx, g_cur_fmin, g_cur_beta, g_dcut);
@@ -746,12 +754,17 @@ static void finish_calibration(HWND hwnd) {
         return;
     }
     double J = g_cal_steplen / g_cal_count;
+    /* Map the measured deviation onto the three cards. The 3.0 and 5.0 px edges
+     * are the middle band of the old five-bucket scale, kept exactly, so the one
+     * bucket that already meant Balanced still does; the two lighter buckets
+     * collapse into Gentle and the two heavier into Steadiest, and 0.70 / 0.22
+     * sit inside the ranges they replace. UNCHANGED CAVEAT: these thresholds are
+     * validated only on a steady, non-tremor hand. A real tremor user is still
+     * needed to tune them. */
     int preset;
-    if      (J < 1.5) preset = 0;
-    else if (J < 3.0) preset = 1;
-    else if (J < 5.0) preset = 2;
-    else if (J < 8.0) preset = 3;
-    else              preset = 4;
+    if      (J < 3.0) preset = 0;   /* Gentle */
+    else if (J < 5.0) preset = 1;   /* Balanced */
+    else              preset = 2;   /* Steadiest */
     double fmin = PRESETS[preset].fmin, beta = PRESETS[preset].beta;
     cal_window();                 /* the final window counts like any other */
     double hz = cal_tremor_hz();  /* 0 unless a peak PERSISTED across the run */
@@ -811,7 +824,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         return 0;
     case WM_HOTKEY:
         if (w == 1) PostQuitMessage(0);
-        else if (w >= 11 && w <= 15) apply_preset((int)w - 11);
+        else if (w >= 11 && w <= 13) apply_preset((int)w - 11);
         return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -946,7 +959,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
         return 0;
     }
 
-    /* Filter mode: load a calibrated profile if present, else preset 3. */
+    /* Filter mode: load a calibrated profile if present, else Balanced. */
     g_dcut = 1.0;
     double pf_min, pf_beta;
     if (load_profile(&pf_min, &pf_beta, &g_notch_seed_hz)) {
@@ -954,9 +967,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
         g_cur_fmin = pf_min; g_cur_beta = pf_beta;
         LOGF("loaded profile fmin=%.2f beta=%.4f tremor_hz=%.2f\n", pf_min, pf_beta, g_notch_seed_hz);
     } else {
-        g_preset = 2;
-        g_cur_fmin = PRESETS[2].fmin; g_cur_beta = PRESETS[2].beta;
-        LOGF("no profile; default preset=3 fmin=%.2f beta=%.4f\n", g_cur_fmin, g_cur_beta);
+        g_preset = 1;
+        g_cur_fmin = PRESETS[1].fmin; g_cur_beta = PRESETS[1].beta;
+        LOGF("no profile; default preset=2 Balanced fmin=%.2f beta=%.4f\n", g_cur_fmin, g_cur_beta);
     }
     oneeuro_init(&g_fx, g_cur_fmin, g_cur_beta, g_dcut);
     oneeuro_init(&g_fy, g_cur_fmin, g_cur_beta, g_dcut);
@@ -970,7 +983,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     }
 
     RegisterHotKey(hwnd, 1, MOD_CONTROL | MOD_ALT, 'Q');
-    for (int k = 0; k < 5; k++) RegisterHotKey(hwnd, 11 + k, MOD_CONTROL | MOD_ALT, '1' + k);
+    for (int k = 0; k < 3; k++) RegisterHotKey(hwnd, 11 + k, MOD_CONTROL | MOD_ALT, '1' + k);
 
     /* UI control channel: publish status, ignore any pre-existing config.cfg
      * (profile is the startup default), and poll ~5x/sec for live UI changes. */
@@ -983,7 +996,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
         MessageBoxW(NULL,
             L"Tracey is ACTIVE (debug).\n\n"
             L"Draw with the pen; the one-euro filter smooths tremor.\n"
-            L"Ctrl+Alt+1..5 = smoothing strength (beeps N times).\n"
+            L"Ctrl+Alt+1..3 = Gentle / Balanced / Steadiest (beeps N times).\n"
             L"Ctrl+Alt+Q  = quit.",
             L"Tracey", MB_OK | MB_ICONINFORMATION);
     }
@@ -994,7 +1007,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     KillTimer(hwnd, POLL_TIMER_ID);
     KillTimer(hwnd, HB_TIMER_ID);
     UnregisterHotKey(hwnd, 1);
-    for (int k = 0; k < 5; k++) UnregisterHotKey(hwnd, 11 + k);
+    for (int k = 0; k < 3; k++) UnregisterHotKey(hwnd, 11 + k);
     if (g_registered) UnregisterPointerInputTarget(hwnd, PT_PEN);
     if (g_dev) DestroySyntheticPointerDevice(g_dev);   /* NULL if creation failed */
     write_status(0, g_notch_seed_hz);   /* tell the UI we've stopped */
