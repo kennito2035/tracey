@@ -11,7 +11,8 @@ OneNote, Photoshop, a signature box on a web form). Nothing to relearn, no app t
 ---
 
 ## Who it's for & the problem
-Hand tremor (≈10M with Parkinson's worldwide; essential tremor is even more common) turns
+Hand tremor (11.8M with Parkinson's worldwide in 2021, projected to reach 25.2M by 2050;
+essential tremor is more common still, at ~7M in the US alone) turns
 intended pen strokes into jagged, illegible marks, quietly locking people out of signing
 forms, sketching, handwritten notes, and creative software. Tracey is for **anyone whose
 hand shakes when they use a pen** and who wants to keep working independently.
