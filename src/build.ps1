@@ -86,7 +86,24 @@ foreach ($s in @("Root","TrustedPublisher")) {
         $store = Get-Item "Cert:\LocalMachine\$s"; $store.Open("ReadWrite"); $store.Add($cert); $store.Close()
         Write-Host "      Trusted cert in LocalMachine\$s" -ForegroundColor Yellow
     } catch {
-        throw "Cert $($cert.Thumbprint) is NOT trusted in LocalMachine\$s and this shell cannot write there. Re-run build.ps1 from an ELEVATED PowerShell."
+        # Could not write the machine store. Whether that is fatal depends on what
+        # this build is FOR:
+        #   full build  -> the core is about to be installed and RUN, and Windows
+        #                  grants uiAccess only to a binary whose signer the machine
+        #                  trusts. Without it the core starts and silently fails to
+        #                  capture the pen. Stop.
+        #   -NoInstall  -> the output is a binary to hand to the installer, and the
+        #                  INSTALLER establishes trust on the target machine. Signing
+        #                  does not need the machine to trust the cert; only running
+        #                  does. prepare-core.js accepts a signed-but-untrusted core
+        #                  for exactly this reason. Warn and carry on, or a packaging
+        #                  build becomes impossible on any machine that has had the
+        #                  cert removed - which an uninstall does, by design.
+        if (-not $NoInstall) {
+            throw "Cert $($cert.Thumbprint) is NOT trusted in LocalMachine\$s and this shell cannot write there. The core would install but fail to get uiAccess. Re-run build.ps1 from an ELEVATED PowerShell."
+        }
+        Write-Host "      NOTE cert not trusted in LocalMachine\$s and this shell cannot write there." -ForegroundColor Yellow
+        Write-Host "      Signing anyway: -NoInstall output is for the installer, which establishes trust on the target." -ForegroundColor Yellow
     }
 }
 $kits = @("C:\Program Files (x86)\Windows Kits\10\bin","C:\Program Files\Windows Kits\10\bin")
@@ -98,9 +115,20 @@ Write-Host "[4/5] Embedding uiAccess manifest + signing..." -ForegroundColor Cya
 if ($LASTEXITCODE -ne 0) { throw "mt.exe manifest embed failed." }
 & $signtool sign /sha1 $cert.Thumbprint /fd SHA256 /t http://timestamp.digicert.com $OUT_EXE
 if ($LASTEXITCODE -ne 0) { throw "signtool signing failed." }
+# "Signed" and "trusted by THIS machine" are different things, and demanding
+# Status -eq Valid conflated them: the moment the certificate leaves
+# LocalMachine\Root the status becomes UnknownError and a perfectly good signed
+# binary gets rejected. Reject what is actually broken - no signature, or a
+# hash that does not match the file - and report anything else verbatim.
 $sig = Get-AuthenticodeSignature $OUT_EXE
-if ($sig.Status -ne "Valid") { throw "Signature not Valid: $($sig.Status)" }
-Write-Host "      Signed; signature Valid."
+if ($sig.Status -eq "NotSigned" -or $sig.Status -eq "HashMismatch") {
+    throw "Signature is $($sig.Status) - signtool reported success but the file is not properly signed."
+}
+if ($sig.Status -ne "Valid") {
+    Write-Host "      Signed; signature reports $($sig.Status) (this machine does not trust the signer)." -ForegroundColor Yellow
+} else {
+    Write-Host "      Signed; signature Valid."
+}
 
 if ($NoInstall) {
     Write-Host "[5/5] -NoInstall: leaving the signed core in $OUT_EXE" -ForegroundColor Yellow
