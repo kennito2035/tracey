@@ -152,7 +152,7 @@ axZ.set_xticks([]); axZ.set_yticks([])
 for s in axZ.spines.values(): s.set_edgecolor("#333"); s.set_linestyle((0, (4, 3)))
 axZ.set_title("Zoomed in: the shake, smoothed away", fontsize=12.5, color="#222", pad=8)
 
-fig.suptitle("Tracey removes hand tremor from real pen input   ·   validated on 61 Parkinson's patients + 20 controls",
+fig.suptitle("Tracey removes hand tremor from real pen input   ·   validated on 61 Parkinson's patients + 15 controls",
              fontsize=13.5, weight="bold", y=0.99)
 # Numbers, not adjectives - and the caveats a reviewer would otherwise raise first:
 # which drawing this is, and that the zoom's staircase is partly tablet quantisation.

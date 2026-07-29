@@ -136,4 +136,4 @@ turn it off when demoing with a real user.
 
 The percentage under the pad is path-length reduction in this preview window
 only. Do not quote it as a result: the real number is in `VALIDATION.md`
-(~10% stroke jitter removed, 61 patients and 20 controls).
+(~10% stroke jitter removed, 61 patients and 15 controls).

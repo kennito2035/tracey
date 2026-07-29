@@ -18,17 +18,20 @@ learning that needs real tremor data".
 
 Isenkul/Sakar spiral dataset (Wacom tablet, pen X/Y @ ~111-143 Hz; tests SST/DST/STCP). Data is
 gitignored (`v3/data/`) but the analysis is reproducible - run `python v3/analyze_spirals.py`.
-The "Improved Spiral Test" folder is **~100% a duplicate** of the Isenkul set (verified by content
-hash); after dedup the unique Static-Spiral corpus is **61 PD + 20 control** drawings.
+The "Improved Spiral Test" folder is a **duplicate** of the Isenkul set and is excluded outright.
+A content hash is NOT sufficient: five of its "Healthy" files are the same five control subjects'
+same drawings with a few extra trailing samples, so they survive hashing and inflate the control
+arm to 20. Excluding the folder gives **61 PD + 15 control** drawings, matching the dataset's own
+description (62 PD + 15 healthy; one PD file's Static-Spiral segment is empty).
 
 Fitting each drawing's intended Archimedean spiral (`r = a + b*theta`) and measuring the radial
 miss-from-intent:
 
-| Static-Spiral metric | control (n=20) | Parkinson (n=61) |
+| Static-Spiral metric | control (n=15) | Parkinson (n=61) |
 |---|---|---|
-| mean deviation from intended spiral | 3.2 px | **9.5 px (~3x)** |
-| deviation energy in **un-filterable** <2 Hz wander | 86.7% | **95.2%** |
-| one-euro (preset 3) jitter (path-length) reduction | 12.0% | 9.9% |
+| mean deviation from intended spiral | 2.7 px | **9.5 px (~3.5x)** |
+| deviation energy in **un-filterable** <2 Hz wander | 91.6% | **92.3%** |
+| one-euro (preset 3) total path-length reduction | 12.9% | 10.0% |
 
 - **The accuracy gap is not filterable.** 92% of a PD spiral's deviation from the intended shape
   lives below 2 Hz - slow wander that overlaps intended motion. No causal filter (low-pass, notch,

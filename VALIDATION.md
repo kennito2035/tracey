@@ -1,7 +1,7 @@
 # Tracey: validated on real Parkinson's data
 
 **Most hackathon assistive-tech is demoed on a healthy hand. Tracey is validated on 61 real
-Parkinson's patients** (plus 20 controls) from a published clinical spiral-drawing dataset.
+Parkinson's patients** (plus 15 controls) from a published clinical spiral-drawing dataset.
 
 ![Animated: raw shaky pen vs Tracey, drawn in sync](validation_demo.gif)
 
@@ -21,9 +21,12 @@ intended path, preserved (not straightened).*
 ## The data
 The [Isenkul/Sakar Parkinson spiral dataset](https://archive.ics.uci.edu/dataset/395/parkinson+disease+spiral+drawings+using+digitized+graphics+tablet)
 (digitizing tablet, pen X/Y at ~110–143 Hz). Patients trace a printed Archimedean spiral, a
-standard clinical test for hand tremor. We de-duplicated the download (the "Improved Spiral Test"
-folder turned out to be a near-exact copy of the base set) down to a **unique corpus of 61 PD + 20
-control** Static-Spiral drawings.
+standard clinical test for hand tremor. The download ships an "Improved Spiral Test" folder that is
+a second copy of the base set, so we exclude it, and hashing alone is not enough to catch it, since
+five of its "Healthy" files are the same five control subjects' same drawings with a few extra
+trailing samples. Excluding it leaves a **unique corpus of 61 PD + 15 control** Static-Spiral
+drawings, matching the dataset's own description of 62 Parkinson's and 15 healthy participants (one
+PD file has an empty Static-Spiral segment).
 
 ## What Tracey does, measured
 Fitting each drawing's *intended* spiral and comparing raw vs. filtered pen paths:
@@ -31,19 +34,27 @@ Fitting each drawing's *intended* spiral and comparing raw vs. filtered pen path
 All figures below are at the UI's **Steadiest** preset (`fmin 0.22, beta 0.010`), the same setting
 the figure and the GIF are rendered with, so what you see is what the numbers describe.
 
-| metric | control (n=20) | Parkinson's (n=61) |
+| metric | control (n=15) | Parkinson's (n=61) |
 |---|---|---|
-| tremor size (deviation from the intended spiral) | 3.2 px | **9.5 px (≈3× more)** |
-| **4–8 Hz tremor band removed** (clinical PD + essential band) | 4.9% | **19.0%** |
-| excess pen travel removed (wiggle above the intended shape) | 80.1% | **63.7%** |
-| >15 Hz removed (digitizer noise, *not* visible shake) | 10.6% | 19.6% |
-| intended motion (<2 Hz) changed | −2.3% | **−0.6%** |
-| total path length removed (incl. the spiral itself) | 12.0% | 10.0% |
+| tremor size (deviation from the intended spiral) | 2.7 px | **9.5 px (≈3.5× more)** |
+| **4–8 Hz tremor band removed** (clinical PD + essential band) | 16.3% | **19.0%** |
+| excess pen travel removed (wiggle above the intended shape) | 90.4% | **63.7%** |
+| >15 Hz removed (digitizer noise, *not* visible shake) | 33.1% | 19.6% |
+| intended motion (<2 Hz) changed | −3.9% | **−0.6%** |
+| total path length removed (incl. the spiral itself) | 12.9% | 10.0% |
 
-Read the table top-down, because the honest story is in the contrast. Tracey removes **19% of the
-tremor band a neurologist would name**, the 4–8 Hz range covering Parkinson's rest tremor and
-essential tremor, while changing the person's *intended* motion by **under 1%**. That second number is
-the one we are proudest of: many smoothers buy their smoothness by eating the stroke.
+Tracey removes **19% of the tremor band a neurologist would name** (the 4–8 Hz range covering
+Parkinson's rest tremor and essential tremor) while changing the person's *intended* motion by
+**under 1%**. That second number is the one we are proudest of: many smoothers buy their smoothness
+by eating the stroke.
+
+**Note what the control column does and does not say.** Tracey removes a similar *proportion* of the
+4–8 Hz band from a steady hand as from a patient, and it should: it is a linear filter, not a
+classifier, and it has no idea who is holding the pen. What differs is how much there is to remove.
+A Parkinson's drawing deviates from the intended spiral by **3.5× as much**, so the same proportional
+reduction is a far larger absolute improvement, and on a steady hand most of what comes out is
+digitizer noise nobody could see anyway (note the 33% figure in the >15 Hz row). Any claim that a
+filter like this "detects" tremor would be false, and we do not make one.
 
 The 64% "excess pen travel" figure is real but must not be quoted alone: excess travel is dominated
 by very-high-frequency jitter, a good part of which is tablet quantisation rather than the shake a

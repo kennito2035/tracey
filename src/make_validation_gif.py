@@ -106,12 +106,12 @@ fig.suptitle("Tracey removes hand tremor from pen input, in real time",
              fontsize=13.5, weight="bold", y=0.99)
 # TWO lines, not one. As a single line this caption was ~150 characters wide at
 # 8.5pt in an 828px figure, so it overflowed and - being centred - was clipped at
-# BOTH ends: it read "al Parkinson's spiral ... + 20 contr". va="bottom" anchors
+# BOTH ends: it read "al Parkinson's spiral ... + 15 contr". va="bottom" anchors
 # the whole block above the figure edge rather than leaving matplotlib to hang
 # the second line off the bottom.
 fig.text(0.5, 0.018,
          "Real Parkinson's spiral (Isenkul/Sakar) · same hand motion, drawn in sync\n"
-         "4-8 Hz tremor -19%, intended motion unchanged · 61 patients + 20 controls",
+         "4-8 Hz tremor -19%, intended motion unchanged · 61 patients + 15 controls",
          ha="center", va="bottom", fontsize=8.5, color="#555", linespacing=1.6)
 
 step = max(1, n // 100)

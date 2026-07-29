@@ -27,15 +27,29 @@ def _find_data():
             return c
     return os.path.join(HERE, "data")   # default (data is gitignored; place it here)
 DATA = _find_data()
+# The archive's "Improved Spiral Test" folder is EXCLUDED, not deduplicated.
+#
+# It is a second copy of the base set, and MD5 dedup is not enough to catch it. Five of
+# its fifteen "Healthy" files are the SAME five control subjects' same drawings with a
+# handful of extra trailing samples, so they are not byte-identical and survived the
+# hash - inflating the control arm from 15 subjects to 20. The pairing is unambiguous:
+# C_0001/Healthy (1), C_0002/(2), C_0005/(5), C_0006/(6), C_0007/(7), each with
+# identical Static-Spiral starting coordinates and sample counts within 0.6%.
+#
+# Excluding the folder outright makes the corpus exactly match UCI's own description of
+# the dataset - 62 Parkinson's subjects and 15 healthy controls - of which 61 PD have a
+# usable Static Spiral Test (one file's segment is empty).
+#
+# Cost of the old behaviour, for the record: control 4-8 Hz reduction read 4.9% instead
+# of 16.3%, and the <2 Hz share 79.1% instead of 91.6%. No PD figure was affected, since
+# every duplicate in the parkinson arm WAS byte-identical and the hash caught it.
 GROUPS = {
     "control": [
         "parkinson+disease+spiral+drawings+using+digitized+graphics+tablet/hw_dataset/control/*.txt",
-        "Improved Spiral Test Using Digitized Graphics Tablet for Monitoring Parkinson's Disease/data/Healthy/*.txt",
     ],
     "parkinson": [
         "parkinson+disease+spiral+drawings+using+digitized+graphics+tablet/hw_dataset/parkinson/*.txt",
         "parkinson+disease+spiral+drawings+using+digitized+graphics+tablet/new_dataset/parkinson/*.txt",
-        "Improved Spiral Test Using Digitized Graphics Tablet for Monitoring Parkinson's Disease/data/PWP/*.txt",
     ],
 }
 
