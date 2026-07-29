@@ -118,12 +118,50 @@ separate "slow drift I didn't mean" from "slow curve I did mean" without knowing
 advance, so Tracey honestly smooths the shake rather than faking a straightened line it can't
 actually infer. Claiming otherwise would be a lie a clinician would catch in five seconds.
 
+## The tremor-frequency detector, and why it shows you nothing
+
+A sliding-FFT tracker estimates the dominant tremor frequency during calibration. It seeds the
+experimental `--notch` mode. **It has no user-facing readout, and that is a deliberate decision
+backed by these numbers rather than a missing feature.**
+
+Scored on the same 61 patients and 15 controls, as a ranking of two groups:
+
+| statistic | AUC | 95% CI (bootstrap, 20k resamples) |
+|---|---|---|
+| mean in-band peak strength | **0.754** | **[0.644, 0.856]** |
+| strongest in-band peak strength | 0.690 | [0.566, 0.807] |
+
+Both intervals clear 0.5, so the detector carries real information. Before we put a 2.5 Hz
+high-pass ahead of the FFT it did not: AUC 0.395 and 0.358, with intervals of [0.254, 0.534] and
+[0.214, 0.507] that straddle chance entirely. The high-pass is what moved it, and it ships.
+
+**Above chance is still not good enough to show someone a number**, for two separate reasons.
+
+An AUC ranks two *groups*. It says a randomly chosen patient tends to score above a randomly chosen
+control. It does not say that any particular person's reading is their tremor frequency, and those
+are different claims.
+
+And on the task we actually ship, the calibration scribble at roughly 250 Hz rather than a spiral
+at 111, we recorded 20 ten-second takes from a hand with no tremor. Every frequency reported there
+is by definition a false positive. As shipped, the detector reports a tremor for **3 of those 20**,
+at a confident-sounding 5.2 Hz. Before the high-pass it was 20 of 20 at about 4.0 Hz. A 15% chance
+of telling a steady-handed person they have a clinical-band tremor is not a feature worth having,
+so the number stays internal.
+
+The blind spot is structural, not a threshold we failed to tune. At the window size that ships, the
+frequency bins are 1.97 Hz apart and the lowest is discarded as drift, so the detector cannot name
+any tremor between 3.5 and 5 Hz at any amplitude, which is most of the Parkinson's rest-tremor band.
+Doubling the window resolves that band and takes the steady-hand false positives from 3-in-20 to
+20-in-20. There is no setting that both sees the tremor and stays quiet on a hand that does not
+have one.
+
 ## Reproduce it
-Everything above regenerates from the raw data with two scripts in the repo (need `numpy` +
+Everything above regenerates from the raw data with the scripts in the repo (need `numpy` +
 `matplotlib`; drop the [UCI dataset](https://archive.ics.uci.edu/dataset/395/parkinson+disease+spiral+drawings+using+digitized+graphics+tablet)
 into `src/data/` first; it's redistributable but gitignored):
 ```
 python src/analyze_spirals.py         # the numbers (dedup, deviation, filterability)
+python src/analyze_tremor_detect.py   # the detector: AUCs and their bootstrap intervals
 python src/make_validation_figure.py  # the static before/after + zoom
 python src/make_validation_gif.py     # the animated before/after
 ```
