@@ -2,7 +2,7 @@
 /**
  * One-euro filter — PREVIEW ONLY.
  *
- * This mirrors the shape of Kenneth's common/oneeuro.h so the sliders feel
+ * This mirrors the shape of the core's common/oneeuro.h so the sliders feel
  * honest in this window. It never touches real input; the core does that.
  * If the two ever disagree, the C implementation is the source of truth.
  */

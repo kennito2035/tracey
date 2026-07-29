@@ -12,7 +12,8 @@ verbatim, so the figure shows exactly what clicking Steadiest does. Measured on 
 61 PD drawings at this setting: 4-8 Hz tremor -19.0%, intended motion (<2 Hz)
 unchanged within 1%, ink trailing the pen by 4.25 px.
 
-Output PNG is committed as a submission asset (data is gitignored; Julian can't regen).
+Output PNG is committed as a submission asset (the dataset is gitignored, so it cannot be
+regenerated without restoring it first).
 """
 # The UI's "Steadiest" card, verbatim from ui/electron/core-comms.js PRESETS.
 # NOT the C core's preset 5 (0.15/0.080) - that one is far lighter in practice

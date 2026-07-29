@@ -1,6 +1,6 @@
 # Tracey UI
 
-Tray app, settings window, and calibration wizard for tracey. Julian's half of
+Tray app, settings window, and calibration wizard for tracey. The UI half of
 the project. Nothing here touches `src/`: the core is a separate process and
 this talks to it only through `config.cfg` and `status.cfg`.
 
@@ -48,7 +48,7 @@ app's bottom panel to point it anywhere.
 
 ## Run it against the real core
 
-Install the core with Kenneth's `build.ps1`, then just `npm start`. Defaults
+Install the core with `src/build.ps1`, then just `npm start`. Defaults
 already match the handoff contract:
 
 | | path |
@@ -92,9 +92,8 @@ The Advanced panel has both Stop and Start; the tray menu has Stop.
 
 ## Notes from integration (23 Jul)
 
-Both resolved with Kenneth. The core refuses `--calibrate` while a filter
-instance is up, so calibration now stops the core first, see `INTEGRATION.md`
-section 2 for the full sequence. Folder permissions are verified working, with
+The core refuses `--calibrate` while a filter instance is up, so calibration
+drives it in-process instead of launching a second one. Folder permissions are verified working, with
 `build.ps1` granting Users Modify as insurance. The core has a single-instance
 mutex, so pressing Start twice is safe.
 

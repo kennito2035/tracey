@@ -8,9 +8,6 @@ every line comes out shaky. Tracey runs quietly in the background, smooths the p
 in real time, and feeds the cleaned-up input to **whatever app is already open** (Paint,
 OneNote, Photoshop, a signature box on a web form). Nothing to relearn, no app to replace.
 
-> **Building the UI? → start with [GETTING_STARTED.md](GETTING_STARTED.md).** It has your
-> tasks and the exact way the UI talks to the core.
-
 ---
 
 ## Who it's for & the problem
@@ -32,8 +29,7 @@ hand shakes when they use a pen** and who wants to keep working independently.
 2. **Filter** the X/Y path with the **one-euro filter** (Casiez et al., 2012), an adaptive
    low-pass that removes tremor jitter while staying responsive to fast, intentional motion.
    Pressure/tilt pass through untouched.
-3. **Re-inject** the smoothed stroke so the app underneath receives a clean line. A drop-in
-   **Wintab proxy** does the same for legacy-API apps (Photoshop, Clip Studio). An FFT
+3. **Re-inject** the smoothed stroke so the app underneath receives a clean line. An FFT
    **tremor-frequency tracker** also runs during calibration, but it is *not* in the default
    filter path and has no user-facing readout: on real patient data it does not reliably
    identify a tremor frequency. It seeds the experimental `--notch` mode only (see VALIDATION.md).
@@ -49,14 +45,12 @@ hand shakes when they use a pen** and who wants to keep working independently.
   before/after figure, the numbers, and how to reproduce them.
 
 ## Platform support
-**Tracey ships for Windows 10/11.** That is the supported, tested, demoed product: the
-native core, the control channel, and the UI all run there today.
+**Tracey is a Windows 10/11 application.** The native core, the control channel and the UI
+all run there, and that is the whole of what this repository ships.
 
-macOS (CGEventTap) and Linux (evdev/uinput) core backends exist in `src/` as **untested
-scaffolds** and are **future work**, not part of this release. The UI is built on a
-cross-platform stack and its core-communication layer is a thin per-OS adapter, so those
-platforms drop in later without rewriting the interface, but no macOS/Linux build is
-claimed or shipped here.
+The UI is built on a cross-platform stack and its core-communication layer is a thin per-OS
+adapter, so other platforms could be added later without rewriting the interface. No macOS
+or Linux build is claimed or shipped here.
 
 ## Install (Windows 10 1809+ or Windows 11, pen tablet with Windows Ink enabled)
 
@@ -73,8 +67,11 @@ SmartScreen will say the publisher is unknown, because the installer is not comm
 Choose **More info → Run anyway**.
 
 Then open Tracey, turn it on, and draw in any app. `Ctrl+Alt+1..5` sets smoothing strength
-and `Ctrl+Alt+Q` quits, from anywhere. Full details, including the Smart App Control caveat,
-are in [GETTING_STARTED.md](GETTING_STARTED.md).
+and `Ctrl+Alt+Q` quits, from anywhere.
+
+If the core will not start, Windows 11's **Smart App Control** may be blocking it (the build
+is self-signed). Turn it off under Windows Security → App & browser control → Smart App
+Control. This is a one-way change.
 
 ### Or build it yourself
 ```powershell
@@ -96,7 +93,6 @@ promotes to a fatal error.
 ## Repository structure
 ```
 README.md            this file
-GETTING_STARTED.md   build/run + the UI integration contract (read this first if you do UI)
 VALIDATION.md        real-patient validation: before/after figure + GIF, numbers, reproducibility
 validation_spiral.png  static hero (real PD spiral: raw vs Tracey, overlaid + zoom)
 validation_demo.gif    animated before/after (raw shaky pen vs Tracey, drawn in sync)
@@ -107,14 +103,12 @@ ui/                  the cross-platform UI (Electron): tray, settings, calibrati
                        audit.js (cross-layer consistency), prepare-core.js (stages the core)
   build/               INSTALLER config, not build output: installer.nsh (certificate import,
                        ProgramData permissions, shortcut page) + CERTIFICATE_NOTICE.txt (consent)
-src/                 the native-C core + backends
+src/                 the native-C core
   tracey.c             core: capture -> one-euro filter -> re-inject; calibration; --notch; UI channel
   common/oneeuro.h        one-euro filter (header-only)
   common/tremor_tracker.h FFT tremor-frequency tracker
   common/notch.h          adaptive tremor notch (opt-in --notch)
   build.ps1            compile (MSVC) -> sign -> install to C:\Program Files\Tracey
-  wintab_proxy/        drop-in wintab32.dll for Wintab apps (+ standalone test client)
-  macos/, linux/       cross-platform backends (scaffolds, need that OS to build/test)
   test_tracker.c       unit test for the tremor tracker
   test_notch.c         notch vs one-euro comparison (synthetic, two regimes)
   analyze_spirals.py, make_validation_figure.py, make_validation_gif.py   real-data analysis (reproduces VALIDATION.md)
@@ -125,7 +119,8 @@ LICENSE              MIT
 ```
 
 ## Roadmap
-- **Cross-platform:** macOS (CGEventTap) and Linux (evdev/uinput) backends; 32-bit Wintab; touch.
+- **Cross-platform:** macOS (CGEventTap) and Linux (evdev/uinput) support; Wintab for
+  legacy-API apps such as Photoshop and Clip Studio; touch input.
 - **Intention model:** use the *intended* shape to correct tremor drift, the piece that could
   turn a shaky line straight. Our patient-data analysis shows this is ill-posed for freeform
   drawing without a shape prior (see [VALIDATION.md](VALIDATION.md)): a research direction, not

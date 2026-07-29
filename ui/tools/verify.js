@@ -2,7 +2,7 @@
 'use strict';
 /**
  * Contract regression suite. Runs the UI's side of the control channel against
- * the mock core and checks every guarantee in INTEGRATION.md section 5.
+ * the mock core and checks every guarantee in the core/UI control contract.
  *
  *   npm run verify
  *

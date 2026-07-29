@@ -249,7 +249,7 @@ print("Pushing harder: PD 4-8 Hz reduction vs the lag it costs")
 print("=" * 78)
 # core preset 5 is in here on purpose: it is what Ctrl+Alt+5 selects, and it is
 # NOT the same as the UI's Steadiest card. The demo has to be filmed on the card,
-# and the size of that difference is the reason - see SUBMISSION.md.
+# and the size of that difference is the reason.
 SETTINGS = [("Gentle    ", 0.70, 0.050), ("Balanced  ", 0.40, 0.020),
             ("Steadiest ", 0.22, 0.010), ("core p5   ", 0.15, 0.080),
             ("heavy-1   ", 0.15, 0.005),
