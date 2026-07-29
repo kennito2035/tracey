@@ -37,7 +37,9 @@ hand shakes when they use a pen** and who wants to keep working independently.
 
 ## Evidence: validated on real patients
 - **Real hardware** (XP-Pen tablet): the full capture → filter → re-inject pipeline works
-  end-to-end in real apps, including Microsoft Paint.
+  end-to-end in real apps, verified in **Microsoft Paint and Adobe Photoshop**. Photoshop is
+  the case that matters most: it takes the pen through Windows Ink like everything else, so
+  it needs nothing special from us.
 - **61 Parkinson's patients + 20 controls** (public spiral-drawing dataset, pen X/Y ~110–140 Hz;
   deduplicated): Parkinson's tremor is **~3× a steady hand's** deviation, and Tracey removes
   **~10% of stroke jitter**, the visible shake. We also measured, honestly, what it *can't* do:
@@ -120,8 +122,7 @@ LICENSE              MIT
 ```
 
 ## Roadmap
-- **Cross-platform:** macOS (CGEventTap) and Linux (evdev/uinput) support; Wintab for
-  legacy-API apps such as Photoshop and Clip Studio; touch input.
+- **Cross-platform:** macOS (CGEventTap) and Linux (evdev/uinput) support; touch input.
 - **Intention model:** use the *intended* shape to correct tremor drift, the piece that could
   turn a shaky line straight. Our patient-data analysis shows this is ill-posed for freeform
   drawing without a shape prior (see [VALIDATION.md](VALIDATION.md)): a research direction, not
