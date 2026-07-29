@@ -243,6 +243,37 @@ if __name__ == "__main__":
         wins = sum((p > n) + 0.5 * (p == n) for p in pos for n in neg)
         return wins / (len(pos) * len(neg))
 
+    def _auc_fast(pos, neg):
+        """Vectorised twin of auc(), used only by the bootstrap below.
+
+        auc() is a readable double loop, which is the right shape for a number printed
+        once. At 20,000 resamples it takes minutes, so the bootstrap uses this instead.
+        The two agree exactly on the real data, and that is asserted before the CI is
+        printed rather than assumed.
+        """
+        d = pos[:, None] - neg[None, :]
+        return float(((d > 0).sum() + 0.5 * (d == 0).sum()) / (pos.size * neg.size))
+
+    def boot_ci(pos, neg, n=20000, seed=7):
+        """Percentile bootstrap 95% CI on the AUC, each arm resampled with replacement.
+
+        This is what makes "above chance" a claim rather than an assertion: the point
+        estimate alone says nothing about how much of it is 15 controls' worth of luck.
+        The LOWER bound is the number that matters. Seeded, so the published interval
+        reproduces exactly instead of wobbling in the third decimal between runs.
+        """
+        p = np.asarray(pos, float)
+        q = np.asarray(neg, float)
+        if p.size == 0 or q.size == 0:
+            return float("nan"), float("nan")
+        rng = np.random.default_rng(seed)
+        bs = np.empty(n)
+        for i in range(n):
+            bs[i] = _auc_fast(rng.choice(p, p.size, replace=True),
+                              rng.choice(q, q.size, replace=True))
+        lo, hi = np.percentile(bs, [2.5, 97.5])
+        return float(lo), float(hi)
+
     for tag, kw in (("raw", {}), ("2.5 Hz high-pass", {"highpass": 2.5})):
         c = peak_stats(unique_files(GROUPS["control"]), **kw)
         p = peak_stats(unique_files(GROUPS["parkinson"]), **kw)
@@ -250,9 +281,19 @@ if __name__ == "__main__":
         for name, idx in (("strongest peak strength", 0), ("mean peak strength", 1)):
             cv = [r[idx] for r in c]
             pv = [r[idx] for r in p]
+            a = auc(pv, cv)
+            assert abs(a - _auc_fast(np.asarray(pv, float),
+                                     np.asarray(cv, float))) < 1e-12, \
+                "auc() and _auc_fast() disagree; the CI would not describe the printed AUC"
             print(f"  {name:<24} control med {np.median(cv):.3f} "
                   f"[{np.percentile(cv,25):.3f}-{np.percentile(cv,75):.3f}]   "
                   f"PD med {np.median(pv):.3f} "
                   f"[{np.percentile(pv,25):.3f}-{np.percentile(pv,75):.3f}]   "
-                  f"AUC {auc(pv, cv):.3f}")
+                  f"AUC {a:.3f}")
+            lo, hi = boot_ci(pv, cv)
+            verdict = ("above chance" if lo > 0.5 else
+                       "touches chance, cannot claim" if hi > 0.5 else
+                       "BELOW chance")
+            print(f"  {'':<24} 95% CI [{lo:.3f}, {hi:.3f}]  {verdict}   "
+                  f"(n={len(cv)} controls is what makes it this wide)")
         print("  (AUC 0.5 = the measure carries no PD/control information at all)")
