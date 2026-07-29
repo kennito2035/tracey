@@ -307,6 +307,23 @@ function matchPreset(presets) {
     const p = presets.find((q) => q.id === id);
     return !!p && samePair(p.fmin, p.beta);
   };
+  /* A hotkey is an explicit choice of a NAMED preset and the core says so:
+   * apply_preset() publishes preset=1..3, while anything set through the UI or
+   * loaded from a profile publishes 0 (g_preset = -1). That statement has to
+   * beat a sticky ui.picked, and it has to win BEFORE the check below.
+   *
+   * This only started mattering when the core adopted the UI's preset table.
+   * Calibration now lands on EXACTLY one of the three cards, so after clicking
+   * Custom the profile and that card are indistinguishable by value, and
+   * stillHolds(CUSTOM_ID) stayed true forever: pressing Ctrl+Alt+1 on a hand
+   * calibrated to Gentle left Custom lit and Gentle never highlighted, while 2
+   * and 3 worked. Adopt the core's answer as the new explicit pick. */
+  const fromCore = ui.state && ui.state.status ? ui.state.status.preset : null;
+  if (fromCore && presets.some((p) => p.id === fromCore) && stillHolds(fromCore)) {
+    ui.picked = fromCore;
+    return fromCore;
+  }
+
   if (ui.picked && stillHolds(ui.picked)) return ui.picked;
 
   const hit = presets.find((p) => samePair(p.fmin, p.beta));
