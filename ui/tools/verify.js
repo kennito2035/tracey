@@ -167,6 +167,9 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   const DEAD = (preset) => ({ running: 0, stale: true,  preset });
   const pick = (profile, status, picked, fmin, beta) => {
    ui.state = { profile, status }; ui.picked = picked; ui.fmin = fmin; ui.beta = beta;
+   // Each case is a STEADY state, so seed wasLive to match: otherwise a LIVE
+   // case would leave an edge behind and silently clear the next case's pick.
+   ui.wasLive = !!(status && status.running);
    return R.matchPreset(PRESETS);
   };
   const CUSTOM = R.CUSTOM_ID;
@@ -194,6 +197,18 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   t('uncalibrated, values match nothing', pick(null, LIVE(0), null, 0.33, 0.017) === 0);
   t('calibrated, sliders moved away', pick(INTERP, LIVE(0), null, 0.33, 0.017) === 0);
   t('calibrated, sliders moved onto Gentle', pick(INTERP, LIVE(0), null, 0.7, 0.05) === 1);
+
+  // Stopping the core must CLEAR the highlight, not leave the last one lit. The
+  // values do not change on Stop (config.cfg still holds them), so the sticky
+  // pick stayed true and Custom sat lit above a stopped Tracey. Needs a
+  // sequence: the running push is what puts the adopted pick there to clear.
+  ui.state = { profile: INTERP, status: LIVE(0) };
+  ui.picked = null; ui.wasLive = false; ui.fmin = 0.5365; ui.beta = 0.03365;
+  const whileRunning = R.matchPreset(PRESETS);
+  ui.state = { profile: INTERP, status: DEAD(0) };
+  const afterStop = R.matchPreset(PRESETS);
+  t('running: Custom is lit', whileRunning === CUSTOM);
+  t('stopping the core clears the highlight', afterStop === 0);
  }
 
  console.log('--- calibration path ---');

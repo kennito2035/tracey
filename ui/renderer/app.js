@@ -341,6 +341,14 @@ function matchPreset(presets) {
    * core that stopped is not evidence of anything. */
   const st = ui.state ? ui.state.status : null;
   const coreLive = !!(st && st.running);
+  /* The core going DOWN clears the selection that was in force, including one
+   * this function adopted from the core itself a moment earlier. Without this
+   * the sticky check below outlives the process: on Stop, profile.cfg still
+   * equalled the values sitting in config.cfg, so stillHolds() stayed true and
+   * Custom remained lit above a stopped Tracey. Only the EDGE clears, so a card
+   * clicked deliberately while stopped is left alone. */
+  if (ui.wasLive && !coreLive) ui.picked = null;
+  ui.wasLive = coreLive;
   const fromCore = coreLive ? st.preset : null;
   if (fromCore && presets.some((p) => p.id === fromCore) && stillHolds(fromCore)) {
     ui.picked = fromCore;
