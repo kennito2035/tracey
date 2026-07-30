@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, shell, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { CoreComms, defaultDir, PRESETS, PARAM_RANGES } = require('./core-comms');
@@ -436,35 +436,13 @@ function setParams({ fmin, beta, enabled }) {
  * `--notch` seed survives until the core restarts. Clearing does not lie about
  * this — it just cannot reach into the elevated process to fix it.
  */
-async function clearCalibration() {
-  /* ASK FIRST. This used to delete on the single click, on the reasoning that
-   * re-measuring costs ten seconds. That reasoning undersells what is lost: the
-   * ten seconds are a scribble the user has to perform, and for the people this
-   * is built for a controlled ten-second scribble is not a trivial ask. The
-   * button also sits in the same Settings group as the harmless "Open folder",
-   * with no undo behind it.
-   *
-   * Cancel is the DEFAULT and the Esc action, so the destructive answer has to
-   * be chosen deliberately. Modal to the window rather than app-modal, so it
-   * cannot end up behind it. */
-  const parent = win && !win.isDestroyed() ? win : null;
-  const { response } = await dialog.showMessageBox(parent, {
-    type: 'question',
-    buttons: ['Cancel', 'Delete calibration'],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true,
-    title: 'Tracey',
-    message: 'Delete your calibration?',
-    detail: 'Smoothing goes back to Balanced, and Custom is switched off until you '
-          + 'calibrate again. Measuring again takes about ten seconds.\n\n'
-          + 'Your practice pad drawing is kept.',
-  });
-  if (response !== 1) {
-    core.logUi('clear calibration: cancelled');
-    return { ok: true, cancelled: true, message: null };
-  }
-
+/* The RENDERER confirms before calling this, in an in-app dialog. It was briefly
+ * done here with dialog.showMessageBox and that is why the note above exists:
+ * while the core runs, RPIT takes the raw pen and the injected HOVER pointer is
+ * never promoted to a mouse message for a window that does not speak WM_POINTER,
+ * so a native prompt sat there with no visible cursor. Nothing else invokes this
+ * channel, so the confirm belongs where the cursor works. */
+function clearCalibration() {
   const dir = core.paths().dir;
   const gone = [], failed = [];
   for (const f of ['profile.cfg', 'calpath.cfg']) {

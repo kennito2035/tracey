@@ -504,24 +504,58 @@ $('openFolder').addEventListener('click', () => window.tracey.openFolder());
    Custom card with them, dropping back to Balanced. Deliberately NOT behind a
    confirm — losing it costs a ten-second scribble, and the button says exactly
    what it does. The practice pad is untouched; it is not calibration. */
+/**
+ * Confirm deleting the calibration. Resolves true only for a deliberate Delete.
+ *
+ * In-app rather than the main process's dialog.showMessageBox: see the comment
+ * on #clearDialog in index.html. A native dialog left the user with no visible
+ * cursor whenever the core was running, because RPIT takes the raw pen and the
+ * injected HOVER pointer is not promoted to a mouse message for a window that
+ * does not speak WM_POINTER. Chromium does, so an in-app dialog behaves like the
+ * rest of the UI, which is where the pen already works.
+ *
+ * Listeners are removed before resolving, so the close() below cannot land a
+ * second answer through the `close` handler.
+ */
+function confirmClear() {
+  return new Promise((resolve) => {
+    const dlg = $('clearDialog');
+    const cancel = $('clearCancel');
+    const ok = $('clearConfirm');
+    const done = (yes) => {
+      dlg.removeEventListener('close', onClose);
+      cancel.removeEventListener('click', onCancel);
+      ok.removeEventListener('click', onOk);
+      if (dlg.open) dlg.close();
+      resolve(yes);
+    };
+    const onClose = () => done(false);     // Esc counts as Cancel
+    const onCancel = () => done(false);
+    const onOk = () => done(true);
+    dlg.addEventListener('close', onClose);
+    cancel.addEventListener('click', onCancel);
+    ok.addEventListener('click', onOk);
+    dlg.showModal();
+    cancel.focus();                        // the safe answer holds the focus
+  });
+}
+
 $('clearCal').addEventListener('click', async () => {
+  // Answering Cancel must leave everything alone, the wizard's in-memory
+  // scribble included: resetting it would make Cancel look half applied.
+  if (!(await confirmClear())) return;
   const btn = $('clearCal');
   btn.disabled = true;
   try {
     const res = await window.tracey.clearCalibration();
     ui.clearError = res && res.ok === false ? res.message : null;
-    // Answering Cancel must leave the wizard exactly as it was. Deleted nothing,
-    // so reset nothing: wiping the in-memory scribble here would make Cancel
-    // look like it had half worked.
-    if (!(res && res.cancelled)) {
-      // The wizard keeps its result in memory, so the files going away is not
-      // enough: reset it here or reopening it would show the cleared scribble.
-      lastCal = null;
-      livePath = [];
-      pathOrigin = null;
-      resetCal();
-      if (calDlg.open) livePlot();
-    }
+    // The wizard keeps its result in memory, so the files going away is not
+    // enough: reset it here or reopening it would show the cleared scribble.
+    lastCal = null;
+    livePath = [];
+    pathOrigin = null;
+    resetCal();
+    if (calDlg.open) livePlot();
     render(await window.tracey.getState());
   } finally {
     btn.disabled = false;

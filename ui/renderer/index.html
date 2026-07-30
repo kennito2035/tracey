@@ -195,6 +195,25 @@
   </div>
 </dialog>
 
+<!-- Destructive with no undo, so it asks first.
+     IN-APP on purpose, not dialog.showMessageBox: the core takes the raw pen via
+     RPIT and re-injects a HOVER pointer, which Chromium renders a cursor for and
+     a native Win32 dialog does not, because hover is not promoted to a mouse
+     message. A native prompt therefore left the user with NO visible cursor for
+     as long as Tracey was running. Confirmed by testing with the core stopped,
+     where the same dialog behaved normally.
+     Cancel is the `primary` button and takes focus: the safe answer should be
+     the prominent one, and Esc closes the dialog as a cancel. -->
+<dialog id="clearDialog" aria-labelledby="clearTitle">
+  <h2 id="clearTitle">Delete your calibration?</h2>
+  <p class="dialog-sub">Smoothing goes back to Balanced, and Custom is switched off until you
+    calibrate again. Measuring again takes about ten seconds. Your practice pad drawing is kept.</p>
+  <div class="dialog-actions">
+    <button class="soft" id="clearConfirm" type="button">Delete calibration</button>
+    <button class="primary" id="clearCancel" type="button">Cancel</button>
+  </div>
+</dialog>
+
 <!-- Replaces the native scrollbar. Hidden until the page actually overflows. -->
 <div class="scrollbar" id="scrollbar" aria-hidden="true" hidden>
   <div class="scrollbar-thumb" id="scrollThumb"></div>
