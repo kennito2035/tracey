@@ -178,10 +178,17 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   // A live core naming a preset outranks a sticky Custom: this is the hotkey.
   t('hotkey beats a sticky Custom', pick(CLAMPED, LIVE(1), CUSTOM, 0.7, 0.05) === 1);
   t('explicit named click beats Custom', pick(CLAMPED, LIVE(0), 3, 0.22, 0.01) === 3);
-  // A dead core's preset id is not evidence. Left trusted, an id from Ctrl+Alt+3
-  // outlived its core and overwrote ui.picked on every push, so Custom bounced.
-  t('dead core: stale preset id ignored', pick(CLAMPED, DEAD(3), null, 0.22, 0.01) === CUSTOM);
-  t('dead core: Custom click not overwritten', pick(CLAMPED, DEAD(3), CUSTOM, 0.22, 0.01) === CUSTOM);
+  // A STOPPED Tracey applies nothing, so nothing is highlighted. Custom in
+  // particular waits until the core has started and loaded the profile, rather
+  // than lighting the moment a profile exists on disk.
+  t('stopped core: nothing highlighted, clamped profile', pick(CLAMPED, DEAD(3), null, 0.22, 0.01) === 0);
+  t('stopped core: nothing highlighted, interpolated profile',
+    pick(INTERP, DEAD(0), null, 0.5365, 0.03365) === 0);
+  // ...and a dead core's preset id must not select a card either. Left trusted,
+  // an id from Ctrl+Alt+3 outlived its core and, because that branch also writes
+  // ui.picked, overwrote an explicit Custom click on every push: the bounce.
+  t('stopped core: explicit Custom click still holds',
+    pick(CLAMPED, DEAD(3), CUSTOM, 0.22, 0.01) === CUSTOM);
   // Uncalibrated and hand-set states must be unaffected by all of the above.
   t('uncalibrated, values are a card', pick(null, LIVE(2), null, 0.4, 0.02) === 2);
   t('uncalibrated, values match nothing', pick(null, LIVE(0), null, 0.33, 0.017) === 0);

@@ -349,6 +349,15 @@ function matchPreset(presets) {
 
   if (ui.picked && stillHolds(ui.picked)) return ui.picked;
 
+  /* A STOPPED Tracey is applying nothing, so no card describes it and none is
+   * highlighted. Everything below reads the live state, and while the core is
+   * down that state is a file on disk describing a process that no longer
+   * exists. In particular a calibrated profile must NOT light Custom here: it
+   * lights when the core has actually started and loaded it, which is after the
+   * UAC prompt is accepted, not the moment the profile appears on disk. An
+   * explicit click this session still wins, above. */
+  if (!coreLive) return 0;
+
   /* preset=0 is the core stating that these values did NOT come from a named
    * card (g_preset = -1: a calibrated profile, or the sliders). It cannot ride
    * the branch above, because 0 is falsy and no card carries that id, so it has
@@ -356,12 +365,8 @@ function matchPreset(presets) {
    * at both ends: J <= 2 saves exactly Gentle and J >= 6 exactly Steadiest, and
    * the value match below would then light that named card on a hand that had
    * just been calibrated, which is the one moment Custom has to win. Placed
-   * AFTER the sticky check so an explicit click on a named card still holds.
-   *
-   * With NO live core there is no such statement to read, and profile.cfg is
-   * then the only durable record of where the current numbers came from, so it
-   * decides rather than the value match below. */
-  if ((fromCore === 0 || !coreLive) && stillHolds(CUSTOM_ID)) {
+   * AFTER the sticky check so an explicit click on a named card still holds. */
+  if (fromCore === 0 && stillHolds(CUSTOM_ID)) {
     ui.picked = CUSTOM_ID;
     return CUSTOM_ID;
   }
