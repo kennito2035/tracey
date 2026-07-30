@@ -294,3 +294,43 @@ for name, fmin, beta in SETTINGS:
     keep = np.array(res[name][0]); lag = np.array(res[name][1])
     print(f"  {name} fmin={fmin:<5} beta={beta:<6}  4-8Hz REDUCED {100*(1-keep.mean()):5.1f}%"
           f"   ink lags pen by {lag.mean():5.2f} px")
+
+# ---------------------------------------------------------------------------
+# The 4-8 Hz row in VALIDATION.md sets control against Parkinson, so both cells
+# have to be the SAME statistic. Two are defensible and they do not agree:
+#
+#   ratio-of-means : 1 - mean(filtered)/mean(raw). Weights each drawing by its
+#                    absolute tremor amplitude, so the shakiest dominate. This is
+#                    what the by-band table above reports.
+#   mean-of-ratios : 1 - mean(filtered/raw). Weights every drawing equally, i.e.
+#                    "what a typical hand gets". This is what the lag sweep above
+#                    reports, and it is the published headline.
+#
+# They got mixed once: the control cell was quoted ratio-of-means (16.3%) beside a
+# Parkinson cell quoted mean-of-ratios (19.0%), which is not a comparison at all.
+# Both are printed here so neither can be quoted without its pair.
+print()
+print("=" * 78)
+print("4-8 Hz reduction, both statistics, both groups (the VALIDATION.md row)")
+print("=" * 78)
+print(f"  {'group':<11}{'preset':<11}{'ratio-of-means':>16}{'mean-of-ratios':>16}   n")
+for _grp in ("control", "parkinson"):
+    for _name, _fmin, _beta in PRESETS_SWEEP:
+        _raw, _flt, _rat = [], [], []
+        for _f in unique_files(GROUPS[_grp]):
+            _a = load(_f)
+            if _a is None: continue
+            _x, _y, _t = static_spiral(_a)
+            if len(_x) < 200: continue
+            _d, _fit = fit_spiral(_x, _y)
+            if _d is None: continue
+            _dt = np.diff(_t); _dt = _dt[(_dt > 0) & (_dt < 1000)]
+            _fs = 1000.0 / np.median(_dt) if len(_dt) else 143.0
+            _xf = oneeuro(_x, _t, _fmin, _beta); _yf = oneeuro(_y, _t, _fmin, _beta)
+            _df = deviation_against(_xf, _yf, _fit)
+            _r = band_rms(_d, _fs, lo=4.0, hi=8.0)
+            _fl = band_rms(_df, _fs, lo=4.0, hi=8.0)
+            _raw.append(_r); _flt.append(_fl); _rat.append(_fl / (_r + 1e-12))
+        _rom = 100 * (1 - np.mean(_flt) / np.mean(_raw))
+        _mor = 100 * (1 - np.mean(_rat))
+        print(f"  {_grp:<11}{_name:<11}{_rom:15.1f}%{_mor:15.1f}%   {len(_rat)}")

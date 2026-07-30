@@ -39,11 +39,18 @@ the figure and the GIF are rendered with, so what you see is what the numbers de
 | metric | control (n=15) | Parkinson's (n=61) |
 |---|---|---|
 | tremor size (deviation from the intended spiral) | 2.7 px | **9.5 px (≈3.5× more)** |
-| **4–8 Hz tremor band removed** (clinical PD + essential band) | 16.3% | **19.0%** |
+| **4–8 Hz tremor band removed** (clinical PD + essential band) | 18.3% | **19.0%** |
 | excess pen travel removed (wiggle above the intended shape) | 90.4% | **63.7%** |
 | >15 Hz removed (digitizer noise, *not* visible shake) | 33.1% | 19.6% |
 | intended motion (<2 Hz) changed | −3.9% | **−0.6%** |
 | total path length removed (incl. the spiral itself) | 12.9% | 10.0% |
+
+*Both cells of the 4–8 Hz row are the same statistic: each drawing's own reduction, averaged over
+the group, so the two columns are comparable and every drawing counts equally. The other rows are
+group aggregates. `analyze_spirals.py` prints both statistics for both groups at every preset,
+because these two got mixed once: a control figure computed one way (16.3%) sat beside a patient
+figure computed the other (19.0%), which is not a comparison. Under the aggregate statistic the
+same pair reads 16.3% and 20.7%.*
 
 Tracey removes **19% of the tremor band a neurologist would name** (the 4–8 Hz range covering
 Parkinson's rest tremor and essential tremor) while changing the person's *intended* motion by
@@ -51,7 +58,8 @@ Parkinson's rest tremor and essential tremor) while changing the person's *inten
 by eating the stroke.
 
 **Note what the control column does and does not say.** Tracey removes a similar *proportion* of the
-4–8 Hz band from a steady hand as from a patient, and it should: it is a filter, not a classifier,
+4–8 Hz band from a steady hand as from a patient, 18.3% against 19.0%, and it should: it is a
+filter, not a classifier,
 and it has no idea who is holding the pen. It *does* adapt, but only to pen **speed**: the one-euro
 cutoff is `fmin + beta * |velocity|`, recomputed on every sample from a smoothed estimate of the
 pen's own velocity (`src/common/oneeuro.h`). That makes it nonlinear and time-varying, and no more
