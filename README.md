@@ -30,8 +30,9 @@ hand shakes when they use a pen** and who wants to keep working independently.
 - **Smooths pen input in real time**, system-wide: tremor becomes visibly steadier.
 - **Works in every pen/ink app**: it filters input *before* the app sees it.
 - **Calibrates to the individual**: a 10-second scribble measures how much your hand actually
-  moves and auto-tunes; live presets (light → heavy) dial it in.
-- **Stays out of the way**: background service; mouse and keyboard untouched, only the pen.
+  moves and interpolates between the presets; **Gentle**, **Balanced** and **Steadiest** dial it
+  in by hand.
+- **Stays out of the way**: runs in the background; mouse and keyboard untouched, only the pen.
 
 ## How it works
 1. **Intercept** the pen (Windows pointer APIs + a signed **uiAccess** process to capture
@@ -123,9 +124,12 @@ src/                 the native-C core
   common/tremor_tracker.h FFT tremor-frequency tracker
   common/notch.h          adaptive tremor notch (opt-in --notch)
   build.ps1            compile (MSVC) -> sign -> install to C:\Program Files\Tracey
+  README.md            what the v3 DSP layer is, what is built and what is parked
   test_tracker.c       unit test for the tremor tracker
   test_notch.c         notch vs one-euro comparison (synthetic, two regimes)
-  analyze_spirals.py, make_validation_figure.py, make_validation_gif.py   real-data analysis (reproduces VALIDATION.md)
+  test_latency.c       the added-latency table in VALIDATION.md
+  analyze_spirals.py, analyze_tremor_detect.py, make_validation_figure.py,
+  make_validation_gif.py   real-data analysis (reproduces VALIDATION.md)
 packaging/           uiaccess_manifest.xml (requireAdministrator + uiAccess),
                      tracey.rc + tracey.ico (the core's icon and version strings: what the
                      UAC prompt shows, so not cosmetic)
