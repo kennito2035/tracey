@@ -51,8 +51,12 @@ Parkinson's rest tremor and essential tremor) while changing the person's *inten
 by eating the stroke.
 
 **Note what the control column does and does not say.** Tracey removes a similar *proportion* of the
-4–8 Hz band from a steady hand as from a patient, and it should: it is a linear filter, not a
-classifier, and it has no idea who is holding the pen. What differs is how much there is to remove.
+4–8 Hz band from a steady hand as from a patient, and it should: it is a filter, not a classifier,
+and it has no idea who is holding the pen. It *does* adapt, but only to pen **speed**: the one-euro
+cutoff is `fmin + beta * |velocity|`, recomputed on every sample from a smoothed estimate of the
+pen's own velocity (`src/common/oneeuro.h`). That makes it nonlinear and time-varying, and no more
+selective for tremor: it carries no model of tremor, of intent, or of the person.
+What differs is how much there is to remove.
 A Parkinson's drawing deviates from the intended spiral by **3.5× as much**, so the same proportional
 reduction is a far larger absolute improvement, and on a steady hand most of what comes out is
 digitizer noise nobody could see anyway (note the 33% figure in the >15 Hz row). Any claim that a
