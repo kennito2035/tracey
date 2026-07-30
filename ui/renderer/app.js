@@ -510,13 +510,18 @@ $('clearCal').addEventListener('click', async () => {
   try {
     const res = await window.tracey.clearCalibration();
     ui.clearError = res && res.ok === false ? res.message : null;
-    // The wizard keeps its result in memory, so the files going away is not
-    // enough — reset it here or reopening it would show the cleared scribble.
-    lastCal = null;
-    livePath = [];
-    pathOrigin = null;
-    resetCal();
-    if (calDlg.open) livePlot();
+    // Answering Cancel must leave the wizard exactly as it was. Deleted nothing,
+    // so reset nothing: wiping the in-memory scribble here would make Cancel
+    // look like it had half worked.
+    if (!(res && res.cancelled)) {
+      // The wizard keeps its result in memory, so the files going away is not
+      // enough: reset it here or reopening it would show the cleared scribble.
+      lastCal = null;
+      livePath = [];
+      pathOrigin = null;
+      resetCal();
+      if (calDlg.open) livePlot();
+    }
     render(await window.tracey.getState());
   } finally {
     btn.disabled = false;
