@@ -238,10 +238,11 @@ function applyParams(fmin, beta) {
  * The three named cards plus Custom, all in one row.
  *
  * Custom (id 4) is a real, selectable option that re-applies the saved
- * calibration — not a label. Calibration picks from FIVE core levels and only
- * one of them coincides with a named card, so a calibrated profile used to
- * leave every card unselected, which read as "nothing is chosen". It is
- * disabled until a calibration exists for it to apply.
+ * calibration, not a label. Calibration INTERPOLATES between the three cards,
+ * so its result normally sits between two of them and coincides with no card
+ * at all; without this card a calibrated profile would leave every card
+ * unselected, which reads as "nothing is chosen". It is disabled until a
+ * calibration exists for it to apply.
  */
 const CUSTOM_ID = 4;
 
@@ -302,7 +303,7 @@ const samePair = (fmin, beta) =>
 /**
  * Which card the live values correspond to; CUSTOM_ID if they are the profile's.
  *
- * A calibration can land on EXACTLY a named preset's pair — a real one here came
+ * A calibration can land on EXACTLY a named preset's pair: a real one here came
  * back fmin 0.400 / beta 0.0200, which is Balanced to the digit. Both cards are
  * then legitimately "current", and the named one won on every status push, so
  * clicking Custom looked like a dead button: it applied the values and the
@@ -336,6 +337,19 @@ function matchPreset(presets) {
   }
 
   if (ui.picked && stillHolds(ui.picked)) return ui.picked;
+
+  /* preset=0 is the core stating that these values did NOT come from a named
+   * card (g_preset = -1: a calibrated profile, or the sliders). It cannot ride
+   * the branch above, because 0 is falsy and no card carries that id, so it has
+   * to be tested on its own. It matters because interpolated calibration CLAMPS
+   * at both ends: J <= 2 saves exactly Gentle and J >= 6 exactly Steadiest, and
+   * the value match below would then light that named card on a hand that had
+   * just been calibrated, which is the one moment Custom has to win. Placed
+   * AFTER the sticky check so an explicit click on a named card still holds. */
+  if (fromCore === 0 && stillHolds(CUSTOM_ID)) {
+    ui.picked = CUSTOM_ID;
+    return CUSTOM_ID;
+  }
 
   const hit = presets.find((p) => samePair(p.fmin, p.beta));
   if (hit) return hit.id;

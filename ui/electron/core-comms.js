@@ -250,11 +250,21 @@ class CoreComms {
     const e = enabled ? 1 : 0;
     const f = clamp(Number(fmin), PARAM_RANGES.fmin.min, PARAM_RANGES.fmin.max);
     const b = clamp(Number(beta), PARAM_RANGES.beta.min, PARAM_RANGES.beta.max);
+    /* Precision MUST match what the core publishes: tracey.c writes profile.cfg
+     * and status.cfg as "%.4f" fmin and "%.5f" beta. Writing fewer digits here
+     * was lossless for the three named cards (0.700/0.0500, 0.400/0.0200,
+     * 0.220/0.0100) and silently lossy for anything else, which stopped being a
+     * theoretical case the moment calibration began INTERPOLATING between them.
+     * A measured profile of 0.5365/0.03365 came back through this file as
+     * 0.536/0.0336, so the core adopted a pair that no longer equalled the
+     * profile: samePair() failed and the Custom card deselected itself one
+     * status push after being clicked, having quietly moved the user's
+     * calibrated values on the way. */
     let body =
       '# config.cfg - written by the Tracey UI. Safe to overwrite.\n' +
       `enabled=${e}\n` +
-      `fmin=${f.toFixed(3)}\n` +
-      `beta=${b.toFixed(4)}\n`;
+      `fmin=${f.toFixed(4)}\n` +
+      `beta=${b.toFixed(5)}\n`;
     if (quit) body += 'quit=1\n';
     if (calibrate) body += 'calibrate=1\n';
 

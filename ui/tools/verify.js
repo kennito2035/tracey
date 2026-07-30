@@ -16,7 +16,7 @@ process.env.TRACEY_DIR = SCRATCH;
 // The real core measures for CAL_SECONDS (10). What is under test is the
 // SEQUENCE, not the duration, so the mock's window is shortened here.
 process.env.TRACEY_MOCK_CAL_MS = '1500';
-const {CoreComms}=require(path.join(__dirname,'..','electron','core-comms'));
+const {CoreComms,parseCfg}=require(path.join(__dirname,'..','electron','core-comms'));
 const {spawn}=require('child_process');
 const fs=require('fs');
 const MOCK=path.join(__dirname,'mock-core.js');
@@ -124,6 +124,18 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   // Deleted is definitive.
   fs.rmSync(f, { force: true });
   t('deleted profile -> null', pc.readProfile() === null);
+
+  // Clicking Custom re-applies the profile THROUGH config.cfg, so whatever
+  // calibration measured has to survive that trip unchanged. It did not: the
+  // three named cards all fit in 3 and 4 decimals, so nothing noticed until
+  // calibration started INTERPOLATING between them. 0.5365 came back 0.536,
+  // the core adopted a pair that no longer equalled profile.cfg, and Custom
+  // deselected itself one status push after the click, having moved the
+  // user's calibrated values on the way. Tolerances are samePair()'s.
+  pc.writeConfig({ enabled: 1, fmin: 0.5365, beta: 0.03365 });
+  const back = parseCfg(fs.readFileSync(path.join(iso, 'config.cfg'), 'utf8'));
+  t('interpolated fmin survives config.cfg', Math.abs(Number(back.fmin) - 0.5365) < 1e-6);
+  t('interpolated beta survives config.cfg', Math.abs(Number(back.beta) - 0.03365) < 1e-9);
  }
 
  console.log('--- calibration path ---');

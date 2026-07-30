@@ -53,13 +53,18 @@ function parse(text) {
   return out;
 }
 
+/* Precision matches the REAL core: tracey.c writes status.cfg as "%.4f" fmin
+ * and "%.5f" beta. This mock rounded to 3 and 4, the same way the UI used to
+ * round config.cfg, so a value that the real product mangled on the round trip
+ * survived intact here and the whole suite was blind to it. A mock that is
+ * kinder than the core tests a contract nobody speaks. */
 function writeStatus() {
   const body =
-    '# status.cfg — written by MOCK core\n' +
+    '# status.cfg - written by MOCK core\n' +
     `running=${state.running}\n` +
     `enabled=${state.enabled}\n` +
-    `fmin=${Number(state.fmin).toFixed(3)}\n` +
-    `beta=${Number(state.beta).toFixed(4)}\n` +
+    `fmin=${Number(state.fmin).toFixed(4)}\n` +
+    `beta=${Number(state.beta).toFixed(5)}\n` +
     `preset=${state.preset}\n` +
     `tremor_hz=${Number(state.tremor_hz).toFixed(2)}\n` +
     `calibrating=${state.calibrating}\n` +
