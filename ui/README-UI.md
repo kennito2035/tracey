@@ -206,9 +206,12 @@ under `prefers-reduced-motion`.
 ## Demo notes
 
 The drawing pad shows raw input in amber under filtered output in teal: the
-before/after the pitch is built on, live and interactive. **Simulate a tremor**
-injects synthetic shake so the difference is visible even with a steady hand;
-turn it off when demoing with a real user.
+before/after the pitch is built on, live and interactive. The checkbox labelled
+**"Pretend my hand shakes"** (`#simShake`) injects synthetic shake so the
+difference is visible even with a steady hand; turn it off when demoing with a
+real user. Quote the label as it ships: this file called it "Simulate a tremor"
+until 2026-07-30, and a demo script written against a control that does not exist
+under that name wastes a take.
 
 The percentage under the pad is path-length reduction in this preview window
 only. Do not quote it as a result: the real number is in `VALIDATION.md`

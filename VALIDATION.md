@@ -97,7 +97,7 @@ property of a causal low-pass against a tremor overlapping intended motion, not 
 |---|---|
 | tablet -> Windows delivers the sample | not attributable to Tracey; the pen reports every **3.8 ms** (measured) |
 | **filter group delay** | **the whole story, see below** |
-| filter -> re-inject | **35 us** measured across every real session (`inject_avg`, 31-43 us) |
+| filter -> re-inject | **35 us** measured across every real session (`inject_avg`, 30-43 us) |
 | app draws it -> screen | the app's own pipeline, identical with or without Tracey |
 
 The filter's delay is **speed-dependent by construction**: the one-euro cutoff is
