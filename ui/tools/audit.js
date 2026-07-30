@@ -211,6 +211,24 @@ section('cross-language constants');
   }
 }
 
+section('window chrome');
+{
+  // autoHideMenuBar only HIDES Electron's default menu, and Windows reveals a
+  // hidden menu bar the moment ALT is pressed. Tracey's own hotkeys are
+  // Ctrl+Alt+1..3, so using the feature the README documents popped a stock
+  // File/Edit/View/Window/Help bar open over the app. That bar also costs 24px
+  // of viewport against the 21px of clearance the window height is measured to,
+  // so it cut the Advanced button off the bottom, and it exposed Reload and
+  // Toggle DevTools in a shipping build. setApplicationMenu(null) is the only
+  // thing that stops the reveal: setMenuBarVisibility(false) does not, because
+  // ALT simply un-hides it again.
+  const hides = /autoHideMenuBar:\s*true/.test(mainJs);
+  const removed = /Menu\.setApplicationMenu\(\s*null\s*\)/.test(mainJs);
+  if (removed) ok('application menu removed, so ALT cannot reveal a menu bar');
+  else if (hides) bad('main.js hides the menu bar but never removes it: ALT reveals it, and Ctrl+Alt+1..3 presses ALT');
+  else note('no menu-bar handling found in main.js');
+}
+
 section('duplicate files');
 {
   const uiFiles = ['electron/core-comms.js', 'electron/main.js', 'electron/preload.js',

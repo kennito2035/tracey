@@ -237,6 +237,24 @@ function showWindow() {
 }
 
 function createWindow() {
+  /* No application menu at all. `autoHideMenuBar` only HIDES Electron's default
+   * File/Edit/View/Window/Help bar, and Windows reveals a hidden menu bar when
+   * ALT is pressed. Tracey's own hotkeys are Ctrl+Alt+1..3, so using the feature
+   * the README documents popped a stock Electron menu open over the app.
+   *
+   * It is not only ugly. That bar costs 24px of viewport, and the layout is
+   * measured at 21px of clearance below the Advanced summary (see the height
+   * comment below), so revealing it cut the Advanced button off the bottom:
+   * the exact defect the window height was retuned twice to fix. It also
+   * exposed Reload, Force Reload and Toggle DevTools in a shipping build.
+   *
+   * setApplicationMenu(null) is the only thing that stops the ALT reveal;
+   * setMenuBarVisibility(false) does not, because ALT un-hides it again. Safe
+   * here because the renderer has no text input: only range sliders, buttons
+   * and one checkbox, so no menu-owned clipboard accelerator is being removed.
+   * `autoHideMenuBar` stays for belt and braces and keeps the measured geometry
+   * identical. */
+  Menu.setApplicationMenu(null);
   win = new BrowserWindow({
     width: 700,
     // 780, not 880: at 125% display scaling a 1080p desktop is only 864 logical
