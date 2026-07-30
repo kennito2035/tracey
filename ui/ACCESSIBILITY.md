@@ -21,9 +21,9 @@ removed; it was ranked.
 - Main switch: **208 × 96 px**. It is the most-used control and it is the
   largest thing in the app.
 - Every button, stepper and card: **≥ 44 px**, the WCAG 2.5.5 target size.
-- Sliders are never the only way to set a value. Each has **48 px `−` / `+`
+- Sliders are never the only way to set a value. Each has **50 px `−` / `+`
   steppers**, so nobody has to land a precise drag. Three named presets cover
-  the common cases in a single tap.
+  the common cases in a single tap, with Custom re-applying a calibration.
 - Cards are large tap areas rather than small text links.
 
 ## Every tap is acknowledged
@@ -39,26 +39,46 @@ the clothes of polish.
 Computed with the WCAG 2.1 relative-luminance formula. AA needs 4.5:1 for body
 text, 3:1 for large text and UI components.
 
+Against `--surface`, the card colour most text actually sits on.
+
 | Element | Ratio | |
 |---|---|---|
-| Body text `#17222E` on `#FFFFFF` | **16.1:1** | AAA |
-| Secondary text `#44566A` | **7.5:1** | AAA |
-| Teal small text `#0A6B60` | **6.4:1** | AAA |
+| Body text `#23211D` on `#EFEDE7` | **13.7:1** | AAA |
+| Secondary text `#54504A` | **6.8:1** | AA |
+| Teal small text `#0A6B60` | **5.5:1** | AA |
 | White on teal button `#0B7F72` | **4.9:1** | AA |
-| Amber text `#A05E1C` | **5.1:1** | AA |
+| Amber text `#8F5417` | **5.2:1** | AA |
 | Dark theme body `#EAF1F7` on `#1B2733` | **13.3:1** | AAA |
-| Dark theme secondary `#9BAFC2` | **6.7:1** | AAA |
+| Dark theme secondary `#9BAFC2` | **6.7:1** | AA |
 
 One bug this caught: filled teal buttons were originally `#0F9E8E`, which is
 **3.3:1** against white, below AA. Darkened to `#0B7F72`.
 
-## Light by default, dark by choice
+**Recomputed against the shipped tokens on 2026-07-30, and three rows moved.** The
+table had been quoting a retired palette: `#17222E` on `#FFFFFF` and `#44566A` are
+in no stylesheet in this repo, and `#A05E1C` survives only in a comment recording
+that it was replaced when the surfaces went warmer. The light theme is not paper
+white, so measuring against `#FFFFFF` flattered every light-theme row. Two rows
+labelled AAA are AA once measured against the colour they are really drawn on:
+AAA wants 7:1 for body text and these land at 6.8 and 5.5. Everything still clears
+AA. Claiming a level the palette does not reach is the kind of error an
+accessibility document least affords.
+
+## The system's choice by default, either by preference
 
 Large fields of bright text on near-black halate for people with astigmatism,
-which is common in the age group most affected by essential tremor. So the
-default is light. But some low-vision users genuinely need dark, so it is a
-toggle rather than a decision made for them. First launch follows the operating
-system setting.
+which is common in the age group most affected by essential tremor. But some
+low-vision users genuinely need dark, so this is a toggle rather than a decision
+made for them. **First launch follows the operating system setting**, falling
+back to light where the system expresses no preference; the toggle then wins
+and persists.
+
+That is what this section always claimed. It was not what the code did: the
+renderer defaulted to dark unconditionally, on the grounds that the window sits
+beside a drawing canvas and a bright panel next to artwork is distracting. That
+is a taste argument overriding an accessibility one, and it was also overriding a
+choice the user had already made once, at the operating system. Corrected
+2026-07-30, in the code rather than in the claim.
 
 ## Colour carries meaning, and the meaning matters
 

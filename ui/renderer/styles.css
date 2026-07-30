@@ -24,7 +24,9 @@
      eye and compete with the artwork. Text colours below are NOT softened - they
      carry the contrast ratios the design depends on. */
   --steady:      #2C8C82;   /* fills and large type */
-  --steady-ink:  #0A6B60;   /* small type on light, 6.4:1 */
+  --steady-ink:  #0A6B60;   /* small type on light, 5.5:1 against --surface (AA).
+                               The 6.4:1 this used to claim was measured against
+                               white, and the light theme is not white. */
   --steady-fill: #0B7F72;   /* filled buttons: white text = 4.9:1 */
   --steady-soft: #EFF6F5;   /* page wash, tag + toggle backgrounds */
   --shake:       #8F5417;   /* text; strokes use --shake-stroke. Darkened when the

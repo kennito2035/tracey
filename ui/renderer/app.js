@@ -32,9 +32,21 @@ function applyTheme(mode) {
 (function initTheme() {
   let saved = null;
   try { saved = localStorage.getItem('theme'); } catch {}
-  // Dark is the product default: this window sits beside a drawing canvas, and a
-  // bright panel next to artwork is distracting. A user's own choice still wins.
-  applyTheme(saved || 'dark');
+  if (saved) { applyTheme(saved); return; }
+  /* First launch follows the OPERATING SYSTEM, and falls back to LIGHT.
+   *
+   * This used to be an unconditional dark, on the grounds that the window sits
+   * beside a drawing canvas and a bright panel next to artwork is distracting.
+   * That is a taste argument and it was overriding an accessibility one: large
+   * fields of bright text on near-black halate for people with astigmatism,
+   * which is common in the age group most affected by essential tremor. A user
+   * who has already told Windows they want light has made that choice once
+   * and should not have to make it again here.
+   *
+   * Their own toggle still wins and still persists, which is why `saved` is
+   * checked first. ACCESSIBILITY.md described this behaviour before the code
+   * did; the code is what was wrong. */
+  applyTheme(matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 })();
 
 $('themeBtn').addEventListener('click', () => {

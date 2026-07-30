@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, shell, nativeTheme } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { CoreComms, defaultDir, PRESETS, PARAM_RANGES } = require('./core-comms');
@@ -276,7 +276,11 @@ function createWindow() {
     maximizable: false,
     fullscreenable: false,
     show: false,
-    backgroundColor: '#131C26',   // matches the dark theme: no white flash on open
+    /* Match what the renderer is about to pick, or the first paint flashes the
+     * wrong colour. The renderer follows the OS unless the user has toggled, and
+     * that toggle lives in localStorage where this process cannot see it, so the
+     * OS is the best guess available here. Values are the two --bg tokens. */
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#131C26' : '#E3E0D9',
     title: 'Tracey',
     icon: path.join(ASSETS, 'icon.png'),
     autoHideMenuBar: true,
