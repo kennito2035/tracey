@@ -79,7 +79,7 @@ Build/run: `cl /nologo /O2 test_tracker.c /Fe:test_tracker.exe` (or `cc -O2 ...`
 
 ## How to wire it into the filter (online adaptation)
 
-In a filter loop (e.g. v1/tracey.c's `on_pen`), per sample:
+In a filter loop (e.g. `tracey.c`'s `on_pen`), per sample:
 
 ```c
 tt_push(&tracker, rawx, rawy, t);
@@ -110,8 +110,11 @@ that total, so the live tracker reports `freq=0` mid-stroke (proven in Scenario 
 `--calibrate` scribble (little intended motion). So the notch is **seeded from calibration**: the
 frequency `--calibrate` measures is persisted (`tremor_hz` in `profile.cfg`) and drives the notch;
 the live tracker only *refines* it on the rare window a peak stands out. No calibration + no live
-peak → the notch stays dormant (and logs "run --calibrate first"). This makes calibration actually
-*do* something beyond the wizard's readout.
+peak → the notch stays dormant (and logs "run --calibrate first"). This makes the measured frequency
+load-bearing, and it is the **only** thing that frequency is for. **It is never shown to the user.**
+The wizard reports no frequency at all, deliberately: on the live calibration task the detector
+still fires on 3 of 20 steady hands at a clinical-sounding ~5.2 Hz, and telling a steady-handed
+person they have a 5.2 Hz tremor is a harm this product will not risk. See `ui/ACCESSIBILITY.md`.
 
 ### Validated with synthetic signals (`test_notch.c`)
 
