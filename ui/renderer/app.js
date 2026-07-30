@@ -329,8 +329,19 @@ function matchPreset(presets) {
    * Custom the profile and that card are indistinguishable by value, and
    * stillHolds(CUSTOM_ID) stayed true forever: pressing Ctrl+Alt+1 on a hand
    * calibrated to Gentle left Custom lit and Gentle never highlighted, while 2
-   * and 3 worked. Adopt the core's answer as the new explicit pick. */
-  const fromCore = ui.state && ui.state.status ? ui.state.status.preset : null;
+   * and 3 worked. Adopt the core's answer as the new explicit pick.
+   *
+   * Only a LIVE core's id means anything. core-comms zeroes `running` for a
+   * stale or exited core but passes `preset` straight through, so an id left in
+   * status.cfg by Ctrl+Alt+3 outlived the core that published it: the next
+   * launch re-selected that card, and because this branch also WRITES
+   * ui.picked it overwrote an explicit Custom click on every status push, so
+   * the highlight bounced back within a beat. That is the same rule
+   * currentParams() already applies to fmin/beta: a status.cfg left behind by a
+   * core that stopped is not evidence of anything. */
+  const st = ui.state ? ui.state.status : null;
+  const coreLive = !!(st && st.running);
+  const fromCore = coreLive ? st.preset : null;
   if (fromCore && presets.some((p) => p.id === fromCore) && stillHolds(fromCore)) {
     ui.picked = fromCore;
     return fromCore;
@@ -345,8 +356,12 @@ function matchPreset(presets) {
    * at both ends: J <= 2 saves exactly Gentle and J >= 6 exactly Steadiest, and
    * the value match below would then light that named card on a hand that had
    * just been calibrated, which is the one moment Custom has to win. Placed
-   * AFTER the sticky check so an explicit click on a named card still holds. */
-  if (fromCore === 0 && stillHolds(CUSTOM_ID)) {
+   * AFTER the sticky check so an explicit click on a named card still holds.
+   *
+   * With NO live core there is no such statement to read, and profile.cfg is
+   * then the only durable record of where the current numbers came from, so it
+   * decides rather than the value match below. */
+  if ((fromCore === 0 || !coreLive) && stillHolds(CUSTOM_ID)) {
     ui.picked = CUSTOM_ID;
     return CUSTOM_ID;
   }

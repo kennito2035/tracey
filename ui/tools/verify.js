@@ -16,7 +16,7 @@ process.env.TRACEY_DIR = SCRATCH;
 // The real core measures for CAL_SECONDS (10). What is under test is the
 // SEQUENCE, not the duration, so the mock's window is shortened here.
 process.env.TRACEY_MOCK_CAL_MS = '1500';
-const {CoreComms,parseCfg}=require(path.join(__dirname,'..','electron','core-comms'));
+const {CoreComms,parseCfg,PRESETS}=require(path.join(__dirname,'..','electron','core-comms'));
 const {spawn}=require('child_process');
 const fs=require('fs');
 const MOCK=path.join(__dirname,'mock-core.js');
@@ -136,6 +136,57 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   const back = parseCfg(fs.readFileSync(path.join(iso, 'config.cfg'), 'utf8'));
   t('interpolated fmin survives config.cfg', Math.abs(Number(back.fmin) - 0.5365) < 1e-6);
   t('interpolated beta survives config.cfg', Math.abs(Number(back.beta) - 0.03365) < 1e-9);
+ }
+
+ console.log('--- which card is selected (renderer matchPreset) ---');
+ // Three shipped defects have come out of this one function, so it gets a
+ // matrix rather than a spot check. It runs the REAL source: extracting the
+ // function out of app.js is the only way to reach renderer logic from here,
+ // and a reimplementation would only ever test the reimplementation.
+ {
+  const asrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
+  const body = (re) => {
+   const m = asrc.match(re);
+   let i = asrc.indexOf('{', m.index), d = 0;
+   for (let j = i; j < asrc.length; j++) {
+    if (asrc[j] === '{') d++;
+    else if (asrc[j] === '}') { d--; if (d === 0) return asrc.slice(m.index, j + 1); }
+   }
+   return null;
+  };
+  const ui = {};
+  const R = new Function('ui', 'PRESETS',
+   asrc.match(/const CUSTOM_ID = \d+;/)[0] + '\n' +
+   asrc.match(/const samePair =[\s\S]*?;\n/)[0] + '\n' +
+   body(/function matchPreset\(/) +
+   '\nreturn { matchPreset, CUSTOM_ID };')(ui, PRESETS);
+
+  const CLAMPED = { fmin: 0.22, beta: 0.01 };       // J >= 6: IS Steadiest, to the digit
+  const INTERP  = { fmin: 0.5365, beta: 0.03365 };  // J = 3.09: coincides with no card
+  const LIVE = (preset) => ({ running: 1, stale: false, preset });
+  const DEAD = (preset) => ({ running: 0, stale: true,  preset });
+  const pick = (profile, status, picked, fmin, beta) => {
+   ui.state = { profile, status }; ui.picked = picked; ui.fmin = fmin; ui.beta = beta;
+   return R.matchPreset(PRESETS);
+  };
+  const CUSTOM = R.CUSTOM_ID;
+
+  // Calibrating must select Custom at BOTH ends of the interpolation.
+  t('fresh calibration, interpolated', pick(INTERP,  LIVE(0), null, 0.5365, 0.03365) === CUSTOM);
+  t('fresh calibration, clamped onto a card', pick(CLAMPED, LIVE(0), null, 0.22, 0.01) === CUSTOM);
+  t('a Custom click holds', pick(CLAMPED, LIVE(0), CUSTOM, 0.22, 0.01) === CUSTOM);
+  // A live core naming a preset outranks a sticky Custom: this is the hotkey.
+  t('hotkey beats a sticky Custom', pick(CLAMPED, LIVE(1), CUSTOM, 0.7, 0.05) === 1);
+  t('explicit named click beats Custom', pick(CLAMPED, LIVE(0), 3, 0.22, 0.01) === 3);
+  // A dead core's preset id is not evidence. Left trusted, an id from Ctrl+Alt+3
+  // outlived its core and overwrote ui.picked on every push, so Custom bounced.
+  t('dead core: stale preset id ignored', pick(CLAMPED, DEAD(3), null, 0.22, 0.01) === CUSTOM);
+  t('dead core: Custom click not overwritten', pick(CLAMPED, DEAD(3), CUSTOM, 0.22, 0.01) === CUSTOM);
+  // Uncalibrated and hand-set states must be unaffected by all of the above.
+  t('uncalibrated, values are a card', pick(null, LIVE(2), null, 0.4, 0.02) === 2);
+  t('uncalibrated, values match nothing', pick(null, LIVE(0), null, 0.33, 0.017) === 0);
+  t('calibrated, sliders moved away', pick(INTERP, LIVE(0), null, 0.33, 0.017) === 0);
+  t('calibrated, sliders moved onto Gentle', pick(INTERP, LIVE(0), null, 0.7, 0.05) === 1);
  }
 
  console.log('--- calibration path ---');
