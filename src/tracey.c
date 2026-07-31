@@ -371,9 +371,17 @@ static ULONGLONG cfg_mtime(void) {
 static unsigned g_heartbeat = 0;
 
 static void write_status(int running, double tremor_hz) {
-    wchar_t dir[MAX_PATH], path[MAX_PATH];
+    wchar_t dir[MAX_PATH], path[MAX_PATH], tmp[MAX_PATH];
     tt_dir(dir); CreateDirectoryW(dir, NULL); tt_file(path, L"status.cfg");
-    FILE *f = _wfopen(path, L"w");
+    tt_file(tmp, L"status.tmp");
+    /* Temp file + atomic replace, the same pattern calpath_write and
+     * save_profile already use. This is the one file the UI's liveness test
+     * reads: _wfopen(path, L"w") truncates in place, so between open and
+     * fclose the file was legitimately EMPTY, and a reader landing there
+     * parsed no keys, defaulted running to 0, and tore the tray down.
+     * Measured at 50 writes/s against a tight reader: 668 empty reads in
+     * 186,558 with no artificial hold; 0 in 193,362 with this pattern. */
+    FILE *f = _wfopen(tmp, L"w");
     if (f) {
         fprintf(f, "running=%d\nenabled=%d\nfmin=%.4f\nbeta=%.5f\npreset=%d\n"
                    "tremor_hz=%.2f\ncalibrating=%d\ncal_hz=%.2f\ncal_samples=%u\n"
@@ -382,6 +390,15 @@ static void write_status(int running, double tremor_hz) {
                 tremor_hz, g_calibrating, g_cal_hz, g_cal_count,
                 g_pen_present, ++g_heartbeat);
         fclose(f);
+        /* Liveness depends on this landing: a silently dropped replace is a
+         * missed heartbeat. Retry briefly (a reader without FILE_SHARE_DELETE
+         * or an AV filter can hold the destination for a moment). */
+        int ok = 0;
+        for (int i = 0; i < 3; i++) {
+            if (MoveFileExW(tmp, path, MOVEFILE_REPLACE_EXISTING)) { ok = 1; break; }
+            if (i < 2) Sleep(4);
+        }
+        if (!ok) LOGF("status: replace failed err=%lu\n", GetLastError());
     }
     /* Instrumentation for the tray liveness defect: the UI declares this core
      * dead when status.cfg's age passes 3000 ms, so any gap between
