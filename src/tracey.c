@@ -29,6 +29,7 @@
 #include <cfgmgr32.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <process.h>   /* _beginthreadex: the pen probe runs off the heartbeat */
 #include <string.h>
 #include <wchar.h>
 #include <math.h>
@@ -307,6 +308,36 @@ static int detect_pen(void) {
     }
     SetupDiDestroyDeviceInfoList(h);
     return found;
+}
+
+/* The probe runs on its own thread, never on the heartbeat. detect_pen is
+ * usually a few ms, but a device probe can block for seconds while the pen
+ * driver is busy, and the heartbeat is the UI's liveness signal: a probe
+ * stall past ~2 s makes the next status.cfg write late, the UI's 3 s
+ * staleness rule declares this core dead, and the tray is torn down while
+ * the core filters on. The thread publishes into g_pen_probe and the beat
+ * only ever reads it, so a stalled probe can cost pen-presence freshness
+ * but never a heartbeat. */
+static volatile LONG g_pen_probe  = -1;   /* last published probe result */
+static volatile LONG g_pen_stop   = 0;
+static HANDLE        g_pen_thread = NULL;
+
+static unsigned __stdcall pen_probe_thread(void *arg) {
+    (void)arg;
+    while (!g_pen_stop) {
+        LARGE_INTEGER t0, t1, fq;
+        QueryPerformanceCounter(&t0);
+        int pen = detect_pen();
+        QueryPerformanceCounter(&t1); QueryPerformanceFrequency(&fq);
+        {
+            long probe_ms = (long)((t1.QuadPart - t0.QuadPart) * 1000 / fq.QuadPart);
+            if (probe_ms > 500)
+                LOGF("pen probe took %ld ms (own thread, heartbeat unaffected)\n", probe_ms);
+        }
+        InterlockedExchange(&g_pen_probe, pen);
+        for (int i = 0; i < 10 && !g_pen_stop; i++) Sleep(100);
+    }
+    return 0;
 }
 
 /* Temp file + atomic replace. The UI reads profile.cfg on every state push to
@@ -880,23 +911,16 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
          * killed one by the file's age. Runs in BOTH modes -- calibration has no poll
          * timer, and a stale status.cfg mid-calibration would look like a dead core. */
         else if (w == HB_TIMER_ID) {
-            /* Re-probe the tablet on every beat. It costs a few ms, so a 1 Hz
-             * re-check is far cheaper than what the UI had to do, and it makes
-             * plug/unplug show up in about a second instead of up to 24.
-             * Instrumented: this beat is also the UI's liveness signal, so a
-             * probe that blocks anywhere near the 3 s staleness threshold is
-             * the prime suspect for "the UI thinks the core died". */
-            LARGE_INTEGER t0, t1, fq;
-            QueryPerformanceCounter(&t0);
-            int pen = detect_pen();
-            QueryPerformanceCounter(&t1); QueryPerformanceFrequency(&fq);
-            {
-                long probe_ms = (long)((t1.QuadPart - t0.QuadPart) * 1000 / fq.QuadPart);
-                if (probe_ms > 500) LOGF("pen probe took %ld ms on the heartbeat\n", probe_ms);
-            }
+            /* This beat is the UI's liveness signal, so nothing here may
+             * block. The tablet probe runs on its own thread
+             * (pen_probe_thread) and publishes into g_pen_probe; the beat
+             * only adopts the latest answer. Plug/unplug still shows up in
+             * a second or two instead of the up-to-24 s the UI's own probe
+             * used to cost. */
+            LONG pen = g_pen_probe;
             if (pen >= 0 && pen != g_pen_present)
                 LOGF("pen tablet %s\n", pen ? "connected" : "disconnected");
-            if (pen >= 0) g_pen_present = pen;
+            if (pen >= 0) g_pen_present = (int)pen;
             write_status(1, g_mode == MODE_CALIBRATE ? 0.0 : g_notch_seed_hz);
         }
         return 0;
@@ -946,6 +970,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     }
     QueryPerformanceFrequency(&g_qpf);
     g_pen_present = detect_pen();   /* so the very first status.cfg carries it */
+    g_pen_probe = g_pen_present;
+    /* Off-heartbeat re-probing: see pen_probe_thread. If the thread cannot
+     * start, presence just stays at the startup answer; liveness is fine. */
+    g_pen_thread = (HANDLE)_beginthreadex(NULL, 0, pen_probe_thread, NULL, 0, NULL);
 
     /* Fullscreen (virtual desktop) layered+transparent+topmost overlay. */
     WNDCLASSW wc; ZeroMemory(&wc, sizeof(wc));
@@ -1088,6 +1116,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     for (int k = 0; k < 3; k++) UnregisterHotKey(hwnd, 11 + k);
     if (g_registered) UnregisterPointerInputTarget(hwnd, PT_PEN);
     if (g_dev) DestroySyntheticPointerDevice(g_dev);   /* NULL if creation failed */
+    g_pen_stop = 1;
+    if (g_pen_thread) {
+        /* A probe can be mid-flight; give it a moment, then let process
+         * teardown reclaim it. Never block shutdown on a stalled driver. */
+        WaitForSingleObject(g_pen_thread, 1500);
+        CloseHandle(g_pen_thread);
+    }
     write_status(0, g_notch_seed_hz);   /* tell the UI we've stopped */
 
     double reduction = (g_rawlen > 0.0) ? (100.0 * (g_rawlen - g_filtlen) / g_rawlen) : 0.0;
