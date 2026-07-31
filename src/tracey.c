@@ -29,6 +29,7 @@
 #include <cfgmgr32.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <process.h>   /* _beginthreadex: the pen probe runs off the heartbeat */
 #include <string.h>
 #include <wchar.h>
@@ -444,6 +445,11 @@ static void write_status(int running, double tremor_hz) {
             if (i < 2) Sleep(4);
         }
         if (!ok) LOGF("status: replace failed err=%lu\n", GetLastError());
+    } else {
+        /* A heartbeat that cannot even open its temp file is a dropped
+         * liveness write: the UI will declare this core dead in 3 s, and
+         * without this line tracey.log would hold no evidence of why. */
+        LOGF("status: could not open status.tmp (errno=%d)\n", errno);
     }
     /* Instrumentation for the tray liveness defect: the UI declares this core
      * dead when status.cfg's age passes 3000 ms, so any gap between
