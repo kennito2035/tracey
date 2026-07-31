@@ -221,6 +221,51 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   t('stopping the core clears the highlight', afterStop === 0);
  }
 
+ console.log('--- practice pad filter parity (renderer oneeuro.js vs core oneeuro.h) ---');
+ // The pad shipped the canonical Casiez form (velocity from the previous RAW
+ // sample) while the core derives velocity from the previous FILTERED output,
+ // so the pad smoothed up to 2.7x harder than the product at Steadiest. Every
+ // published number is measured against the core's variant; the pad must
+ // produce the same output or the sliders misrepresent the shipped feel. This
+ // runs the REAL renderer source against a local statement-for-statement port
+ // of src/common/oneeuro.h so the two can never silently diverge again.
+ {
+  const osrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'oneeuro.js'), 'utf8');
+  const pad = new Function(osrc + '\nreturn { OneEuro };')();
+
+  const refOneEuro = (fmin, beta, dCutoff) => {
+   let xPrev = 0, dxPrev = 0, tPrev = 0, primed = false;
+   const alpha = (cutoff, dt) => { const r = 2 * Math.PI * cutoff * dt; return r / (r + 1); };
+   return (x, tt) => {
+    if (!primed) { primed = true; xPrev = x; tPrev = tt; return x; }
+    const dt = tt - tPrev;
+    if (dt <= 0) return xPrev;
+    const dxRaw = (x - xPrev) / dt;
+    const aD = alpha(dCutoff, dt);
+    const dxHat = aD * dxRaw + (1 - aD) * dxPrev;
+    const fc = fmin + beta * Math.abs(dxHat);
+    const a = alpha(fc, dt);
+    const xHat = a * x + (1 - a) * xPrev;
+    xPrev = xHat; dxPrev = dxHat; tPrev = tt;
+    return xHat;
+   };
+  };
+
+  // A stroke that exposes the divergence: steady travel with a 6 Hz tremor
+  // riding on it plus an 11 Hz texture, sampled at 200 Hz for 4 seconds.
+  for (const p of PRESETS) {
+   const mine = new pad.OneEuro(p.fmin, p.beta);
+   const ref = refOneEuro(p.fmin, p.beta, 1.0);
+   let sum = 0, n = 0;
+   for (let i = 0; i < 800; i++) {
+    const ts = i / 200;
+    const x = 300 * ts + 8 * Math.sin(2 * Math.PI * 6 * ts) + 1.5 * Math.sin(2 * Math.PI * 11 * ts);
+    sum += Math.abs(mine.filter(x, ts) - ref(x, ts)); n++;
+   }
+   t(`pad filter matches the core (${p.name})`, sum / n < 1e-9);
+  }
+ }
+
  console.log('--- calibration path ---');
  // The wizard draws this. It comes from the CORE, not from the system cursor:
  // the cursor moves for any pointing device, so sampling it drew the TOUCHPAD.

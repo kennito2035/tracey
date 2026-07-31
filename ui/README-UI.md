@@ -20,10 +20,12 @@ HTML/CSS/JS, so a fresh clone is running in about a minute.
 npm run verify
 ```
 
-64 checks of the UI's side of the control channel against the mock core, in a
-scratch temp folder. Expect `64 passed, 0 failed`. The last 14 are a matrix over
-`matchPreset()`, extracted live out of `app.js`: three shipped defects have come
-out of that one function, so it is no longer spot-checked.
+67 checks of the UI's side of the control channel against the mock core, in a
+scratch temp folder. Expect `67 passed, 0 failed`. Fourteen of them are a matrix
+over `matchPreset()`, extracted live out of `app.js`: three shipped defects have
+come out of that one function, so it is no longer spot-checked. Three more pin
+the practice pad's one-euro filter to the core's exact variant (velocity from
+the previous filtered output), so the pad cannot drift canonical again.
 
 ```
 node tools/audit.js
