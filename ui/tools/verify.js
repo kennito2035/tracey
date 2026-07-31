@@ -315,6 +315,53 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   t('absent pen key is UNKNOWN', isoCore.readStatus().pen === null);
  }
 
+ console.log('--- torn status reads (the truncate-then-write window) ---');
+ // status.cfg used to be truncated in place by the core: between open and
+ // close the file is legitimately EMPTY. readFileSync succeeds, no key
+ // parses, running defaulted to 0, and one such read reached trayState and
+ // destroyed the tray. The window is frozen here at its observable moments:
+ // an empty file, a keyless read, and a transient non-ENOENT read error (a
+ // sharing violation while the core replaces the file). Each must report the
+ // LAST KNOWN status flagged torn, never a fabricated running=0. An empty
+ // file OLDER than the staleness threshold is a core that died mid-write and
+ // must still read as dead; a DELETED file stays definitive.
+ {
+  const iso = path.join(SCRATCH, 'torn');
+  fs.mkdirSync(iso, { recursive: true });
+  const tc = new CoreComms(iso);
+  const f = path.join(iso, 'status.cfg');
+  const base = 'running=1\nenabled=1\nfmin=0.4000\nbeta=0.02000\npreset=2\n' +
+               'tremor_hz=0.00\ncalibrating=0\ncal_hz=0.00\ncal_samples=0\n' +
+               'pen=1\nheartbeat=7\n';
+  fs.writeFileSync(f, base);
+  t('good read seeds the last-known status', tc.readStatus().running === 1);
+  fs.writeFileSync(f, '');                                // the window, frozen
+  const torn = tc.readStatus();
+  t('empty read is torn, not core-gone', torn.torn === true && torn.running === 1);
+  t('a torn read can never map to trayState off', torn.present !== false && torn.running !== 0);
+  fs.writeFileSync(f, 'enabled=1\nheartbeat=8\n');        // running key missing
+  const keyless = tc.readStatus();
+  t('keyless read is torn, not core-gone', keyless.torn === true && keyless.running === 1);
+  const realRead = fs.readFileSync;
+  try {
+   fs.readFileSync = (p, ...a) => {
+    if (String(p) === f) { const e = new Error('busy'); e.code = 'EPERM'; throw e; }
+    return realRead(p, ...a);
+   };
+   const blocked = tc.readStatus();
+   t('transient read error is torn, not core-gone', blocked.torn === true && blocked.running === 1);
+  } finally { fs.readFileSync = realRead; }
+  fs.writeFileSync(f, '');
+  const old = new Date(Date.now() - 10000);
+  fs.utimesSync(f, old, old);                             // empty AND stale
+  t('an old empty file still reads as dead', tc.readStatus().running === 0);
+  fs.writeFileSync(f, base);
+  const back = tc.readStatus();
+  t('recovery resumes normal reads', back.running === 1 && back.torn === undefined);
+  fs.rmSync(f, { force: true });
+  t('a deleted file is definitive, not torn', tc.readStatus().present === false);
+ }
+
  console.log('--- liveness / heartbeat ---');
  // Start from a clean slate: the mock's mutex refuses to launch while a core is up.
  core.writeConfig({...snap,quit:1});

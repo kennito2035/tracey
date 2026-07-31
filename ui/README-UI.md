@@ -20,12 +20,15 @@ HTML/CSS/JS, so a fresh clone is running in about a minute.
 npm run verify
 ```
 
-67 checks of the UI's side of the control channel against the mock core, in a
-scratch temp folder. Expect `67 passed, 0 failed`. Fourteen of them are a matrix
+75 checks of the UI's side of the control channel against the mock core, in a
+scratch temp folder. Expect `75 passed, 0 failed`. Fourteen of them are a matrix
 over `matchPreset()`, extracted live out of `app.js`: three shipped defects have
 come out of that one function, so it is no longer spot-checked. Three more pin
 the practice pad's one-euro filter to the core's exact variant (velocity from
-the previous filtered output), so the pad cannot drift canonical again.
+the previous filtered output), so the pad cannot drift canonical again. Eight
+more freeze the status.cfg torn-read window (empty, keyless, transient-error,
+stale and deleted reads), so one bad read can never again report a live core
+as stopped.
 
 ```
 node tools/audit.js
