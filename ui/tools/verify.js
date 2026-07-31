@@ -29,6 +29,20 @@ function waitFor(t,to){return new Promise((res,rej)=>{const t0=Date.now();
   if(t(s)){clearInterval(iv);res(s);}else if(Date.now()-t0>to){clearInterval(iv);rej(new Error('timeout'));}},200);});}
 const CHILDREN=[];
 const launch=a=>{const c=spawn(process.execPath,[MOCK,...a],{stdio:'ignore',detached:true,env:process.env});c.unref();CHILDREN.push(c);return c;};
+// Emergency teardown: ask the mock to quit politely, then kill only children
+// that have NOT already exited. Windows recycles PIDs quickly, so killing a
+// long-dead mock's PID could terminate an unrelated process that inherited it.
+const teardown=()=>{
+ try{core.writeConfig({enabled:0,fmin:0.4,beta:0.02,quit:1});}catch{/* best effort */}
+ for(const c of CHILDREN){
+  if(c.exitCode===null&&c.signalCode===null){try{process.kill(c.pid);}catch{/* already gone */}}
+ }
+};
+// Ctrl+C or a CI kill must not strand the detached mock either: a survivor
+// keeps rewriting the scratch status.cfg five times a second and makes the
+// NEXT run fail its three kill-liveness checks with no hint why.
+process.on('SIGINT',()=>{teardown();process.exit(130);});
+process.on('SIGTERM',()=>{teardown();process.exit(143);});
 let pass=0,fail=0;
 const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log('  FAIL',n);} };
 (async()=>{
@@ -449,9 +463,7 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
 })().catch(e=>{
  console.error('ERROR',e.message);
  // A crash must not strand the detached mock: it would keep rewriting the
- // scratch status.cfg five times a second forever. Ask it to quit, then make
- // sure, then exit non-zero.
- try{core.writeConfig({enabled:0,fmin:0.4,beta:0.02,quit:1});}catch{/* best effort */}
- for(const c of CHILDREN){try{process.kill(c.pid);}catch{/* already gone */}}
+ // scratch status.cfg five times a second forever.
+ teardown();
  process.exit(1);
 });
