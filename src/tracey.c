@@ -54,6 +54,7 @@ static int                      g_debug = 0;
 static int                      g_mode  = MODE_FILTER;
 static int                      g_noprompt = 0;  /* --no-prompt: UI drives calibration */
 static FILE                    *g_log = NULL;
+static CRITICAL_SECTION         g_log_cs;   /* serialises LOGF vs close_log */
 static HSYNTHETICPOINTERDEVICE  g_dev = NULL;
 static LARGE_INTEGER            g_qpf;
 static OneEuro                  g_fx, g_fy;
@@ -331,13 +332,26 @@ static unsigned __stdcall pen_probe_thread(void *arg) {
         QueryPerformanceCounter(&t1); QueryPerformanceFrequency(&fq);
         {
             long probe_ms = (long)((t1.QuadPart - t0.QuadPart) * 1000 / fq.QuadPart);
-            if (probe_ms > 500)
+            if (probe_ms > 500 && !g_pen_stop)
                 LOGF("pen probe took %ld ms (own thread, heartbeat unaffected)\n", probe_ms);
         }
         InterlockedExchange(&g_pen_probe, pen);
         for (int i = 0; i < 10 && !g_pen_stop; i++) Sleep(100);
     }
     return 0;
+}
+
+/* Signal and briefly join the probe thread. Called on EVERY exit path that
+ * closes the log: a probe finishing after the close would otherwise try to
+ * log through a freed FILE*. A stalled driver can outlive the join timeout,
+ * which is why close_log's critical section is the second line of defence. */
+static void stop_pen_thread(void) {
+    g_pen_stop = 1;
+    if (g_pen_thread) {
+        WaitForSingleObject(g_pen_thread, 1500);
+        CloseHandle(g_pen_thread);
+        g_pen_thread = NULL;
+    }
 }
 
 /* Temp file + atomic replace. The UI reads profile.cfg on every state push to
@@ -507,9 +521,21 @@ static void poll_config(void) {
     if (changed) { LOGF("config: enabled=%d fmin=%.3f beta=%.4f\n", g_enabled, g_cur_fmin, g_cur_beta); write_status(1, g_notch_seed_hz); }
 }
 
+/* Serialised against close_log: the pen probe thread also logs, and a log
+ * write racing an exit path's fclose would go through a freed FILE*. The
+ * critical section is initialised before the log opens and deliberately
+ * never deleted (static storage outlives every thread). */
 static void LOGF(const char *fmt, ...) {
-    if (!g_log) return;
-    va_list ap; va_start(ap, fmt); vfprintf(g_log, fmt, ap); va_end(ap); fflush(g_log);
+    EnterCriticalSection(&g_log_cs);
+    if (g_log) {
+        va_list ap; va_start(ap, fmt); vfprintf(g_log, fmt, ap); va_end(ap); fflush(g_log);
+    }
+    LeaveCriticalSection(&g_log_cs);
+}
+static void close_log(void) {
+    EnterCriticalSection(&g_log_cs);
+    if (g_log) { fclose(g_log); g_log = NULL; }
+    LeaveCriticalSection(&g_log_cs);
 }
 
 static double now_s(void) {
@@ -943,6 +969,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     g_notch_on = (pCmd && wcsstr(pCmd, L"notch")) ? 1 : 0;
     g_noprompt = (pCmd && wcsstr(pCmd, L"no-prompt")) ? 1 : 0;
 
+    InitializeCriticalSection(&g_log_cs);   /* before the first possible LOGF */
     {
         wchar_t dir[MAX_PATH], path[MAX_PATH];
         tt_dir(dir); CreateDirectoryW(dir, NULL);
@@ -965,7 +992,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
         else if (g_debug)
             MessageBoxW(NULL, L"Tracey is already running.", L"Tracey",
                         MB_OK | MB_ICONINFORMATION);
-        if (g_log) fclose(g_log);
+        close_log();   /* the probe thread has not started yet on this path */
         return 3;
     }
     QueryPerformanceFrequency(&g_qpf);
@@ -1004,6 +1031,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     if (!hwnd) {
         wchar_t b[128]; wsprintfW(b, L"CreateWindowExW failed: %lu", GetLastError());
         MessageBoxW(NULL, b, L"Tracey", MB_OK | MB_ICONERROR);
+        stop_pen_thread();
+        close_log();
         return 1;
     }
     SetLayeredWindowAttributes(hwnd, 0, 1, LWA_ALPHA);
@@ -1033,7 +1062,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
             okReg, regErr, g_dev ? L"created" : L"n/a");
         MessageBoxW(NULL, eb, L"Tracey", MB_OK | MB_ICONERROR);
         if (g_dev) DestroySyntheticPointerDevice(g_dev);
-        if (g_log) fclose(g_log);
+        stop_pen_thread();
+        close_log();
         return 2;
     }
 
@@ -1061,7 +1091,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
         MSG msg;
         while (GetMessageW(&msg, NULL, 0, 0)) { TranslateMessage(&msg); DispatchMessageW(&msg); }
         UnregisterPointerInputTarget(hwnd, PT_PEN);
-        if (g_log) fclose(g_log);
+        stop_pen_thread();
+        close_log();
         return 0;
     }
 
@@ -1116,13 +1147,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     for (int k = 0; k < 3; k++) UnregisterHotKey(hwnd, 11 + k);
     if (g_registered) UnregisterPointerInputTarget(hwnd, PT_PEN);
     if (g_dev) DestroySyntheticPointerDevice(g_dev);   /* NULL if creation failed */
-    g_pen_stop = 1;
-    if (g_pen_thread) {
-        /* A probe can be mid-flight; give it a moment, then let process
-         * teardown reclaim it. Never block shutdown on a stalled driver. */
-        WaitForSingleObject(g_pen_thread, 1500);
-        CloseHandle(g_pen_thread);
-    }
+    stop_pen_thread();
     write_status(0, g_notch_seed_hz);   /* tell the UI we've stopped */
 
     double reduction = (g_rawlen > 0.0) ? (100.0 * (g_rawlen - g_filtlen) / g_rawlen) : 0.0;
@@ -1132,7 +1157,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     LOGF("latency inject_avg=%.0fus inject_max=%.0fus n=%u | pen_gap_avg=%.1fms pen_gap_max=%.1fms n=%u\n",
          g_injN ? g_injUs_total / g_injN : 0.0, g_injUs_max, g_injN,
          g_gapN ? g_gapMs_total / g_gapN : 0.0, g_gapMs_max, g_gapN);
-    if (!g_debug) { if (g_log) fclose(g_log); return 0; }
+    if (!g_debug) { close_log(); return 0; }
 
     wchar_t qb[600];
     wsprintfW(qb,
@@ -1147,6 +1172,6 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
         (int)(g_cur_fmin * 100 + 0.5), (int)(g_cur_beta * 1000 + 0.5),
         g_preset >= 0 ? L"preset" : L"calibrated");
     MessageBoxW(NULL, qb, L"Tracey - summary", MB_OK | MB_ICONINFORMATION);
-    if (g_log) fclose(g_log);
+    close_log();
     return 0;
 }
