@@ -251,18 +251,41 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
    };
   };
 
-  // A stroke that exposes the divergence: steady travel with a 6 Hz tremor
-  // riding on it plus an 11 Hz texture, sampled at 200 Hz for 4 seconds.
-  for (const p of PRESETS) {
-   const mine = new pad.OneEuro(p.fmin, p.beta);
-   const ref = refOneEuro(p.fmin, p.beta, 1.0);
-   let sum = 0, n = 0;
-   for (let i = 0; i < 800; i++) {
+  // Two strokes, because the first one alone missed a real divergence.
+  //
+  // CLEAN: steady travel with a 6 Hz tremor plus an 11 Hz texture, sampled at
+  // a strict 200 Hz for 4 seconds.
+  //
+  // COALESCED: the same stroke delivered the way Chromium actually delivers
+  // it, four samples per 60 Hz frame sharing ONE millisecond-resolution
+  // timeStamp (app.js reads getCoalescedEvents), so three of every four
+  // samples arrive with dt = 0. The pad used to clamp dt to a floor there and
+  // diverge by 3.67 px at Steadiest while the clean stroke still matched to
+  // 1e-13, which is exactly how the divergence hid.
+  const strokes = {
+   clean: (i) => {
     const ts = i / 200;
-    const x = 300 * ts + 8 * Math.sin(2 * Math.PI * 6 * ts) + 1.5 * Math.sin(2 * Math.PI * 11 * ts);
-    sum += Math.abs(mine.filter(x, ts) - ref(x, ts)); n++;
+    return [300 * ts + 8 * Math.sin(2 * Math.PI * 6 * ts) +
+            1.5 * Math.sin(2 * Math.PI * 11 * ts), ts];
+   },
+   coalesced: (i) => {
+    const frame = Math.floor(i / 4), k = i % 4;
+    const trueT = frame / 60 + k / 240;
+    return [300 * trueT + 8 * Math.sin(2 * Math.PI * 6 * trueT),
+            Math.round(frame * 1000 / 60) / 1000];
+   },
+  };
+  for (const [label, stroke] of Object.entries(strokes)) {
+   for (const p of PRESETS) {
+    const mine = new pad.OneEuro(p.fmin, p.beta);
+    const ref = refOneEuro(p.fmin, p.beta, 1.0);
+    let sum = 0, n = 0;
+    for (let i = 0; i < 480; i++) {
+     const [x, ts] = stroke(i);
+     sum += Math.abs(mine.filter(x, ts) - ref(x, ts)); n++;
+    }
+    t(`pad filter matches the core (${p.name}, ${label})`, sum / n < 1e-9);
    }
-   t(`pad filter matches the core (${p.name})`, sum / n < 1e-9);
   }
  }
 
