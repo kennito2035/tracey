@@ -203,6 +203,15 @@ class CoreComms {
       };
     }
     const c = parseCfg(raw);
+    if (raw.length === 0 || c.running === undefined) {
+      // Instrumentation for the tray liveness defect: an empty or keyless read
+      // is the signature of landing inside a writer's truncate-then-write
+      // window. One of these lines coinciding with a tray rebuild is the
+      // proof that a single bad read, not a dead core, tore the tray down.
+      this.logUi(`status.cfg anomalous read: ${raw.length} bytes, running key ` +
+                 `${c.running === undefined ? 'absent' : 'present'}, age ` +
+                 `${ageMs === null ? '?' : Math.round(ageMs)} ms`);
+    }
     const claimsRunning = num(c.running, 0) ? 1 : 0;
 
     // Only judge staleness when the core actually heartbeats. An older core build

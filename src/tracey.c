@@ -383,6 +383,22 @@ static void write_status(int running, double tremor_hz) {
                 g_pen_present, ++g_heartbeat);
         fclose(f);
     }
+    /* Instrumentation for the tray liveness defect: the UI declares this core
+     * dead when status.cfg's age passes 3000 ms, so any gap between
+     * consecutive writes that approaches it is worth a log line. A stalled
+     * heartbeat (for example a slow pen probe on the beat) shows up here as a
+     * LATE write, which no "did every write happen" check would catch. */
+    {
+        static LARGE_INTEGER s_prev;
+        LARGE_INTEGER now, fq;
+        QueryPerformanceCounter(&now); QueryPerformanceFrequency(&fq);
+        if (s_prev.QuadPart) {
+            long ms = (long)((now.QuadPart - s_prev.QuadPart) * 1000 / fq.QuadPart);
+            if (ms > 2500)
+                LOGF("status: %ld ms between status.cfg writes (UI stale threshold 3000)\n", ms);
+        }
+        s_prev = now;
+    }
 }
 static int read_config(int *en, double *fm, double *be, int *quit, int *calib) {
     wchar_t path[MAX_PATH]; tt_file(path, L"config.cfg");
@@ -849,8 +865,18 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         else if (w == HB_TIMER_ID) {
             /* Re-probe the tablet on every beat. It costs a few ms, so a 1 Hz
              * re-check is far cheaper than what the UI had to do, and it makes
-             * plug/unplug show up in about a second instead of up to 24. */
+             * plug/unplug show up in about a second instead of up to 24.
+             * Instrumented: this beat is also the UI's liveness signal, so a
+             * probe that blocks anywhere near the 3 s staleness threshold is
+             * the prime suspect for "the UI thinks the core died". */
+            LARGE_INTEGER t0, t1, fq;
+            QueryPerformanceCounter(&t0);
             int pen = detect_pen();
+            QueryPerformanceCounter(&t1); QueryPerformanceFrequency(&fq);
+            {
+                long probe_ms = (long)((t1.QuadPart - t0.QuadPart) * 1000 / fq.QuadPart);
+                if (probe_ms > 500) LOGF("pen probe took %ld ms on the heartbeat\n", probe_ms);
+            }
             if (pen >= 0 && pen != g_pen_present)
                 LOGF("pen tablet %s\n", pen ? "connected" : "disconnected");
             if (pen >= 0) g_pen_present = pen;
