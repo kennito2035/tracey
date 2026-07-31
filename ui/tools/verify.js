@@ -27,7 +27,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function waitFor(t,to){return new Promise((res,rej)=>{const t0=Date.now();
  const iv=setInterval(()=>{const s=core.readStatus();
   if(t(s)){clearInterval(iv);res(s);}else if(Date.now()-t0>to){clearInterval(iv);rej(new Error('timeout'));}},200);});}
-const launch=a=>{const c=spawn(process.execPath,[MOCK,...a],{stdio:'ignore',detached:true,env:process.env});c.unref();return c;};
+const CHILDREN=[];
+const launch=a=>{const c=spawn(process.execPath,[MOCK,...a],{stdio:'ignore',detached:true,env:process.env});c.unref();CHILDREN.push(c);return c;};
 let pass=0,fail=0;
 const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log('  FAIL',n);} };
 (async()=>{
@@ -145,8 +146,17 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
  // and a reimplementation would only ever test the reimplementation.
  {
   const asrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
-  const body = (re) => {
+  // Anchors must accept ;\r\n as well as ;\n: with `* text=auto` a default
+  // Windows clone checks app.js out with CRLF, and a null match here used to
+  // kill the whole suite at this section with no summary. Fail loudly instead,
+  // never with a TypeError on null.
+  const mustMatch = (re) => {
    const m = asrc.match(re);
+   if (!m) throw new Error(`verify.js could not extract ${re} from renderer/app.js`);
+   return m;
+  };
+  const body = (re) => {
+   const m = mustMatch(re);
    let i = asrc.indexOf('{', m.index), d = 0;
    for (let j = i; j < asrc.length; j++) {
     if (asrc[j] === '{') d++;
@@ -156,8 +166,8 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   };
   const ui = {};
   const R = new Function('ui', 'PRESETS',
-   asrc.match(/const CUSTOM_ID = \d+;/)[0] + '\n' +
-   asrc.match(/const samePair =[\s\S]*?;\n/)[0] + '\n' +
+   mustMatch(/const CUSTOM_ID = \d+;/)[0] + '\n' +
+   mustMatch(/const samePair =[\s\S]*?;\r?\n/)[0] + '\n' +
    body(/function matchPreset\(/) +
    '\nreturn { matchPreset, CUSTOM_ID };')(ui, PRESETS);
 
@@ -321,4 +331,12 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
 
  console.log(`\n${pass} passed, ${fail} failed`);
  process.exit(fail?1:0);
-})().catch(e=>{console.error('ERROR',e.message);process.exit(1);});
+})().catch(e=>{
+ console.error('ERROR',e.message);
+ // A crash must not strand the detached mock: it would keep rewriting the
+ // scratch status.cfg five times a second forever. Ask it to quit, then make
+ // sure, then exit non-zero.
+ try{core.writeConfig({enabled:0,fmin:0.4,beta:0.02,quit:1});}catch{/* best effort */}
+ for(const c of CHILDREN){try{process.kill(c.pid);}catch{/* already gone */}}
+ process.exit(1);
+});

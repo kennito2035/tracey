@@ -7,6 +7,12 @@
 # Must stay LF wherever they land - a shell script with CRLF is not executable.
 *.sh    text eol=lf
 
+# Must stay LF too: tools/verify.js extracts renderer source with regexes, and
+# a CRLF checkout must not behave differently from the LF tree the suite was
+# written on. The anchors are CRLF-tolerant as well; this rule keeps working
+# trees identical across machines in the first place.
+*.js    text eol=lf
+
 # Must stay CRLF - PowerShell and cmd are Windows-only here, and CRLF is what
 # every tool on that side expects.
 *.ps1   text eol=crlf
