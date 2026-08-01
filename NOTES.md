@@ -51,11 +51,16 @@ thread and the heartbeat only adopts its latest published answer.
 - `write_status` logs any gap over 2500 ms between consecutive status.cfg
   writes: `status: N ms between status.cfg writes (UI stale threshold 3000)`.
   A line here is candidate 2's signature.
-- The pen probe logs any run over 500 ms: `pen probe took N ms`.
-- `readStatus` logs every torn or transiently unreadable status read to ui.log:
-  `status.cfg torn read (N bytes, age N ms); kept last known status`. A line
-  here coinciding with a tray rebuild would have been candidate 1's signature;
-  after the atomic write it should never appear against a current core.
+- The pen probe logs any run over 500 ms: `pen probe took N ms`. The line is
+  skipped once shutdown has been signalled, so a stall that only completes
+  during exit leaves no line.
+- `readStatus` logs every torn or transiently unreadable status read to ui.log.
+  Torn reads log `status.cfg torn read (N bytes, age N ms); kept last known
+  status`; transient read errors log `status.cfg transient read error (CODE);
+  kept last known status`. Grep for `kept last known status` to count both. A
+  line here coinciding with a tray rebuild would have been candidate 1's
+  signature; after the atomic write it should never appear against a current
+  core.
 
 ## Status of the fixes
 

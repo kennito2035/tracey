@@ -290,7 +290,7 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;FAILED.push
   // Two strokes, because the first one alone missed a real divergence.
   //
   // CLEAN: steady travel with a 6 Hz tremor plus an 11 Hz texture, sampled at
-  // a strict 200 Hz for 4 seconds.
+  // a strict 200 Hz for 2.4 s (480 samples; the coalesced stroke covers 2.0 s).
   //
   // COALESCED: the same stroke delivered the way Chromium actually delivers
   // it, four samples per 60 Hz frame sharing ONE millisecond-resolution

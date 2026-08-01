@@ -179,7 +179,7 @@ renderer/
   oneeuro.js      preview filter only; the C version is the source of truth
 tools/
   mock-core.js    stand-in for the core (mock-core.cmd / .sh wrap it)
-  verify.js       the 64-check contract suite (npm run verify)
+  verify.js       the 78-check contract suite (npm run verify)
   audit.js        cross-layer consistency (node tools/audit.js)
   prepare-core.js stages the signed core + .cer into build/core/ before packing;
                   refuses to build if the core is missing or unsigned
