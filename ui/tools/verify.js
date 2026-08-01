@@ -47,6 +47,15 @@ const teardown=()=>{
 // NEXT run fail its three kill-liveness checks with no hint why.
 process.on('SIGINT',()=>{teardown();process.exit(130);});
 process.on('SIGTERM',()=>{teardown();process.exit(143);});
+// An exception escaping a timer callback (waitFor's interval runs outside the
+// async chain) would bypass the promise catch entirely; without these hooks it
+// would strand the mock exactly like the pre-fix crash path did.
+process.on('uncaughtException',(e)=>{console.error('ERROR',e.message);
+ if(FAILED.length)console.error('failed checks before the crash:\n  - '+FAILED.join('\n  - '));
+ teardown();process.exit(1);});
+process.on('unhandledRejection',(e)=>{console.error('ERROR',e&&e.message?e.message:String(e));
+ if(FAILED.length)console.error('failed checks before the crash:\n  - '+FAILED.join('\n  - '));
+ teardown();process.exit(1);});
 let pass=0,fail=0;
 const FAILED=[];
 const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;FAILED.push(n);console.log('  FAIL',n);} };
@@ -187,7 +196,9 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;FAILED.push
     if (asrc[j] === '{') d++;
     else if (asrc[j] === '}') { d--; if (d === 0) return asrc.slice(m.index, j + 1); }
    }
-   return null;
+   // Unbalanced braces would otherwise inject the literal text 'null' into
+   // the new Function source and surface as an unnamed TypeError later.
+   throw new Error(`verify.js could not extract a balanced body for ${re} from renderer/app.js`);
   };
   const ui = {};
   const R = new Function('ui', 'PRESETS',
@@ -468,7 +479,10 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;FAILED.push
   const r = await core.launchCore([]);
   t('launchCore reports ok', r.ok === true);
   let ran = false;
-  for (let i = 0; i < 50 && !ran; i++) { await sleep(100); ran = fs.existsSync(marker); }
+  // 30 s budget: powershell cold start + ShellExecute + a cmd stub is the
+  // slowest chain in the suite, and the old 5 s cap was the one remaining
+  // fixed budget of the class the mock-start waits were raised for.
+  for (let i = 0; i < 300 && !ran; i++) { await sleep(100); ran = fs.existsSync(marker); }
   t('launchCore actually ran the target', ran);
   core.exePath = realExe;
  }
