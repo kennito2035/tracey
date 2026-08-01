@@ -1,5 +1,5 @@
 <#
-v1/build.ps1
+src/build.ps1
 Reproducible build of the native (C) Tracey core: compile -> embed the uiAccess
 manifest -> sign -> install to %ProgramFiles%\Tracey.
 
@@ -13,9 +13,12 @@ RUN AS ADMINISTRATOR:
 Then launch from a NON-elevated shell (triggers real UAC):
     Start-Process "C:\Program Files\Tracey\tracey.exe"
 
--NoInstall builds and signs into dist\ but skips the copy into %ProgramFiles%,
-which is the only step that needs elevation. Use it when you just want a fresh
-signed core to hand to the installer, or to rebuild from a normal shell.
+-NoInstall builds and signs into dist\ but skips the copy into %ProgramFiles%.
+That copy is not the only step needing elevation: creating and trusting the
+self-signed certificate writes to Cert:\LocalMachine\Root and \TrustedPublisher,
+so a full run from a normal shell fails at the trust step (with -NoInstall it
+warns and continues). Use -NoInstall when you just want a fresh signed core to
+hand to the installer, or to rebuild from a normal shell.
 #>
 param([switch]$NoInstall)
 $ErrorActionPreference = "Stop"

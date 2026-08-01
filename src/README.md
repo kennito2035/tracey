@@ -91,9 +91,14 @@ if ((sample_count++ % 16) == 0) {           /* re-analyze a few times/sec */
 ```
 
 On a steady hand this is identical to the calibrated baseline (tracker returns baseline);
-with real tremor it lowers the cutoff to target the measured frequency. NOTE: the *benefit*
-is only observable with an actual tremor - the DSP is validated, but "does it help a real
-user" needs a tremor user to confirm, same as the calibration thresholds.
+with real tremor it pins the cutoff to a quarter of the measured frequency. Note the
+direction: the in-band floor is 3 Hz, so a detection always yields fmin >= 0.75, which is
+ABOVE every baseline the product can produce (the presets top out at Gentle's 0.70, and
+calibration interpolates between them). Against that baseline it therefore raises the
+resting cutoff, trading attenuation at rest for a cutoff tied to the tremor rather than to
+speed alone. NOTE: the *benefit* is only observable with an actual tremor - the DSP is
+validated, but "does it help a real user" needs a tremor user to confirm, same as the
+calibration thresholds.
 
 ## What's built: the adaptive tremor notch (`--notch`)
 

@@ -23,27 +23,37 @@ The [Isenkul/Sakar Parkinson spiral dataset](https://archive.ics.uci.edu/dataset
 (digitizing tablet; pen X/Y sampled at either **111 Hz or 143 Hz** depending on the recording:
 26 of the 76 drawings use the slower clock and 50 the faster, with nothing in between). Patients
 trace a printed Archimedean spiral, a
-standard clinical test for hand tremor. The download ships an "Improved Spiral Test" folder that is
-a second copy of the base set, so we exclude it, and hashing alone is not enough to catch it, since
-five of its "Healthy" files are the same five control subjects' same drawings with a few extra
-trailing samples. Excluding it leaves a **unique corpus of 61 PD + 15 control** Static-Spiral
-drawings, matching the dataset's own description of 62 Parkinson's and 15 healthy participants (one
-PD file has an empty Static-Spiral segment).
+standard clinical test for hand tremor. The archive linked above holds `hw_dataset`,
+`hw_drawings` and `new_dataset`; the analysis reads the Static-Spiral segments of
+`hw_dataset` and `new_dataset` and nothing else. That gives a **corpus of 61 PD + 15 control**
+Static-Spiral drawings, matching the dataset's own description of 62 Parkinson's and 15 healthy
+participants (one PD file has an empty Static-Spiral segment).
+
+An earlier revision of this document described excluding a duplicate "Improved Spiral Test"
+folder shipped inside that download, with five near-duplicate control files that MD5 could not
+catch. That folder is **not** in the archive linked here: it was a second, separately downloaded
+archive named after the source paper ("Improved spiral test using digitized graphics tablet"),
+and it is no longer used at all. Against the archive above the hash-dedup step in
+`analyze_spirals.py` removes nothing, and the counts are simply the files on disk.
 
 ## What Tracey does, measured
 Fitting each drawing's *intended* spiral and comparing raw vs. filtered pen paths:
 
-All figures below are at the UI's **Steadiest** preset (`fmin 0.22, beta 0.010`), the same setting
-the figure and the GIF are rendered with, so what you see is what the numbers describe.
+Two presets appear in the table below and each row says which, because they are not
+interchangeable. The frequency-band rows are at the UI's **Steadiest** preset
+(`fmin 0.22, beta 0.010`), the setting the figure and the GIF are rendered with. The three
+path-and-motion rows come from `analyze_spirals.py`'s first block, which is hardcoded to the
+shipped default, **Balanced** (`fmin 0.40, beta 0.020`); they are marked *(Balanced)*. Quoting a
+Steadiest header over a Balanced number is exactly the kind of mix this document exists to avoid.
 
 | metric | control (n=15) | Parkinson's (n=61) |
 |---|---|---|
-| tremor size (deviation from the intended spiral) | 2.7 px | **9.5 px (≈3.5× more)** |
-| **4–8 Hz tremor band removed** (clinical PD + essential band) | 18.3% | **19.0%** |
-| excess pen travel removed (wiggle above the intended shape) | 90.4% | **63.7%** |
-| >15 Hz removed (digitizer noise, *not* visible shake) | 33.1% | 19.6% |
-| intended motion (<2 Hz) changed | −3.9% | **−0.6%** |
-| total path length removed (incl. the spiral itself) | 12.9% | 10.0% |
+| tremor size (deviation from the intended spiral) *(raw input; preset-independent)* | 2.7 px | **9.5 px (≈3.5× more)** |
+| **4–8 Hz tremor band removed** (clinical PD + essential band) *(Steadiest)* | 18.3% | **19.0%** |
+| excess pen travel removed (wiggle above the intended shape) *(Balanced)* | 90.4% | **63.7%** |
+| >15 Hz removed (digitizer noise, *not* visible shake) *(Steadiest)* | 33.1% | 19.6% |
+| intended motion (<2 Hz) changed *(Balanced)* | −3.9% | **−0.6%** |
+| total path length removed (incl. the spiral itself) *(Balanced)* | 12.9% | 10.0% |
 
 *Both cells of the 4–8 Hz row are the same statistic: each drawing's own reduction, averaged over
 the group, so the two columns are comparable and every drawing counts equally. The other rows are
@@ -54,8 +64,9 @@ same pair reads 16.3% and 20.7%.*
 
 Tracey removes **19% of the tremor band a neurologist would name** (the 4–8 Hz range covering
 Parkinson's rest tremor and essential tremor) while changing the person's *intended* motion by
-**under 1%**. That second number is the one we are proudest of: many smoothers buy their smoothness
-by eating the stroke.
+**about 1%** (1.03% at Steadiest, the setting that 19% is measured at; 0.64% at Balanced). That
+second number is the one we are proudest of: many smoothers buy their smoothness by eating the
+stroke. Both halves of that sentence are quoted at the same preset on purpose.
 
 **Note what the control column does and does not say.** Tracey removes a similar *proportion* of the
 4–8 Hz band from a steady hand as from a patient, 18.3% against 19.0%, and it should: it is a

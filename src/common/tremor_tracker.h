@@ -62,9 +62,11 @@ static void tt_push(TremorTracker *t, double x, double y, double t_s) {
  *
  * Deliberately identical to _lowpass() in analyze_tremor_detect.py - a boxcar of
  * width fs/(2*fc) with edge-clamped padding - so the offline measurement on 61 PD
- * + 15 control traces (peak-strength AUC 0.36-0.40 raw, 0.61-0.74 with this)
- * describes the code that actually runs. If you change the kernel here, that
- * number stops applying and has to be re-measured.
+ * + 15 control traces describes the code that actually runs: peak-strength AUC
+ * 0.395 and 0.358 without this high-pass, 0.754 and 0.690 with it (mean and
+ * strongest in-band peak strength; the high-pass ships, so the second pair is
+ * what the shipped detector scores). If you change the kernel here, those
+ * numbers stop applying and have to be re-measured.
  *
  * NOTE this improves the SEED for --notch and the tracker's sensitivity. It is
  * NOT licence to show the user a frequency: AUC separates the two GROUPS on a

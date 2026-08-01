@@ -10,7 +10,9 @@ fmin=0.15 beta=0.012, which is in neither preset table - close to Steadiest in
 effect, but not a setting any user can select. It now uses the UI's Steadiest card
 verbatim, so the figure shows exactly what clicking Steadiest does. Measured on all
 61 PD drawings at this setting: 4-8 Hz tremor -19.0%, intended motion (<2 Hz)
-unchanged within 1%, ink trailing the pen by 4.25 px.
+changed by 1.0%, ink trailing the pen by 4.25 px. That last pair must be quoted at
+THIS preset: the sub-1% figure VALIDATION used to print here is the Balanced one
+(0.64%), and the caption is rendered at Steadiest.
 
 Output PNG is committed as a submission asset (the dataset is gitignored, so it cannot be
 regenerated without restoring it first).
@@ -164,7 +166,7 @@ fig.text(0.5, 0.055,
          ha="center", fontsize=9, color="#555")
 fig.text(0.5, 0.028,
          "Measured across all 61 patients at this setting:  4-8 Hz tremor band  -19%   ·   "
-         "intended motion (<2 Hz) unchanged within 1%   ·   ink trails the pen by 4.3 px.",
+         "intended motion (<2 Hz) changed by 1%   ·   ink trails the pen by 4.3 px.",
          ha="center", fontsize=9.5, color="#222", weight="bold")
 fig.text(0.5, 0.004,
          "Shown: the most tremulous of the 61 drawings, so the effect is visible at print size. "

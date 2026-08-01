@@ -17,6 +17,13 @@ build/
 # time and must NOT be committed (also caught by *.exe above; explicit is better).
 ui/build/core/
 
+# The validation dataset. VALIDATION.md tells you to drop the Isenkul/Sakar
+# spiral set here to reproduce the numbers, and README states no dataset is
+# redistributed. Untracked is not enough for either: one `git add -A` would
+# commit clinical patient recordings, which is the same careless-sweep hazard
+# the __pycache__ rule below guards against, with far worse consequences.
+src/data/
+
 # Logs / local runtime files
 *.log
 
