@@ -10,6 +10,8 @@
     "mock": "node tools/mock-core.js",
     "mock:calibrate": "node tools/mock-core.js --calibrate",
     "verify": "node tools/verify.js",
+    "check-motion": "electron tools/check_reduced_motion.js",
+    "check-tray": "python tools/check_tray_shapes.py",
     "icons": "python tools/make_icons.py",
     "prepare-core": "node tools/prepare-core.js",
     "dist": "node tools/prepare-core.js && electron-builder --win nsis"

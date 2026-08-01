@@ -10,7 +10,7 @@ exactly 0 pixels at every size.
 import os
 from PIL import Image
 
-ASSETS = r"C:\Users\Admin\Documents\tracey\ui\assets"
+ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets")
 STATES = ("active", "paused", "off")
 SIZES = (16, 24, 32, 48)
 

@@ -1,0 +1,11 @@
+<meta charset="utf-8">
+<title>reduced-motion coverage probe</title>
+<!-- Links the REAL stylesheet, not a copy, so this cannot drift away from what
+     ships. It recreates only the elements whose pseudo-element animations a
+     bare `*` rule fails to reach. Driven by tools/check_reduced_motion.js. -->
+<link rel="stylesheet" href="../renderer/styles.css">
+<div class="cards">
+  <button class="preset" aria-pressed="true">Steadiest</button>
+</div>
+<button class="switch"><span class="track"><span class="knob"></span></span></button>
+<details class="advanced"><summary>Advanced</summary></details>

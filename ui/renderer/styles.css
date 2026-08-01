@@ -777,8 +777,13 @@ canvas {
   .choices, .presets { grid-template-columns: 1fr; }
 }
 
+/* ::before and ::after MUST be listed. A bare `*` does not match pseudo-elements,
+ * so the animations declared on them kept running under reduced motion: the
+ * selected-preset checkmark spring (.preset[aria-pressed="true"]::after, an
+ * overshooting 0.32s bounce), the knob wave crossfades, and the Advanced chevron
+ * rotation. An overshoot is exactly the motion this rule exists to suppress. */
 @media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
 

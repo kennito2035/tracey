@@ -120,8 +120,14 @@ they do not have is an accessibility failure, not a feature.
 - Dialogs use the native `<dialog>` element, so focus trapping and Escape are
   handled by the browser rather than by hand-written script.
 - **Every animation is disabled under `prefers-reduced-motion`**, including the
-  ripples, the switch spring and the breathing glow. Vestibular sensitivity and
-  tremor co-occur often enough that this is not optional.
+  ripples, the switch spring, the breathing glow, and the ones declared on
+  pseudo-elements: the selected-preset checkmark's overshooting bounce, the knob
+  wave crossfades and the Advanced chevron. That last group is easy to miss,
+  because the obvious `* { animation: none }` does not match `::before` or
+  `::after` and leaves exactly the overshoot this rule exists to suppress still
+  playing. `npm run check-motion` proves it in the app's own Electron by reading
+  computed styles with reduced motion emulated. Vestibular sensitivity and tremor
+  co-occur often enough that this is not optional.
 
 ## What we did not do
 
