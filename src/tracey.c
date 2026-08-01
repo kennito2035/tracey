@@ -1083,7 +1083,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     /* Calibrate mode: measure action tremor, save a profile, exit. */
     if (g_mode == MODE_CALIBRATE) {
         /* Publish running=1 BEFORE the prompt so the UI wizard sees an unambiguous
-         * 1 -> 0 transition across the whole calibration (prompt + 5 s capture);
+         * 1 -> 0 transition across the whole calibration (prompt + CAL_SECONDS
+         * capture, which is 10 s, not the 5 this comment used to claim);
          * finish_calibration() writes running=0 + tremor_hz when it completes. */
         write_status(1, 0.0);
         if (!g_noprompt) MessageBoxW(NULL,
