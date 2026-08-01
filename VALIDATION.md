@@ -33,17 +33,21 @@ PD file has an empty Static-Spiral segment).
 ## What Tracey does, measured
 Fitting each drawing's *intended* spiral and comparing raw vs. filtered pen paths:
 
-All figures below are at the UI's **Steadiest** preset (`fmin 0.22, beta 0.010`), the same setting
-the figure and the GIF are rendered with, so what you see is what the numbers describe.
+Two presets appear in the table below and each row says which, because they are not
+interchangeable. The frequency-band rows are at the UI's **Steadiest** preset
+(`fmin 0.22, beta 0.010`), the setting the figure and the GIF are rendered with. The three
+path-and-motion rows come from `analyze_spirals.py`'s first block, which is hardcoded to the
+shipped default, **Balanced** (`fmin 0.40, beta 0.020`); they are marked *(Balanced)*. Quoting a
+Steadiest header over a Balanced number is exactly the kind of mix this document exists to avoid.
 
 | metric | control (n=15) | Parkinson's (n=61) |
 |---|---|---|
-| tremor size (deviation from the intended spiral) | 2.7 px | **9.5 px (≈3.5× more)** |
-| **4–8 Hz tremor band removed** (clinical PD + essential band) | 18.3% | **19.0%** |
-| excess pen travel removed (wiggle above the intended shape) | 90.4% | **63.7%** |
-| >15 Hz removed (digitizer noise, *not* visible shake) | 33.1% | 19.6% |
-| intended motion (<2 Hz) changed | −3.9% | **−0.6%** |
-| total path length removed (incl. the spiral itself) | 12.9% | 10.0% |
+| tremor size (deviation from the intended spiral) *(raw input; preset-independent)* | 2.7 px | **9.5 px (≈3.5× more)** |
+| **4–8 Hz tremor band removed** (clinical PD + essential band) *(Steadiest)* | 18.3% | **19.0%** |
+| excess pen travel removed (wiggle above the intended shape) *(Balanced)* | 90.4% | **63.7%** |
+| >15 Hz removed (digitizer noise, *not* visible shake) *(Steadiest)* | 33.1% | 19.6% |
+| intended motion (<2 Hz) changed *(Balanced)* | −3.9% | **−0.6%** |
+| total path length removed (incl. the spiral itself) *(Balanced)* | 12.9% | 10.0% |
 
 *Both cells of the 4–8 Hz row are the same statistic: each drawing's own reduction, averaged over
 the group, so the two columns are comparable and every drawing counts equally. The other rows are
@@ -54,8 +58,9 @@ same pair reads 16.3% and 20.7%.*
 
 Tracey removes **19% of the tremor band a neurologist would name** (the 4–8 Hz range covering
 Parkinson's rest tremor and essential tremor) while changing the person's *intended* motion by
-**under 1%**. That second number is the one we are proudest of: many smoothers buy their smoothness
-by eating the stroke.
+**about 1%** (1.03% at Steadiest, the setting that 19% is measured at; 0.64% at Balanced). That
+second number is the one we are proudest of: many smoothers buy their smoothness by eating the
+stroke. Both halves of that sentence are quoted at the same preset on purpose.
 
 **Note what the control column does and does not say.** Tracey removes a similar *proportion* of the
 4–8 Hz band from a steady hand as from a patient, 18.3% against 19.0%, and it should: it is a
