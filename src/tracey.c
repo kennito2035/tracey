@@ -104,14 +104,18 @@ static unsigned g_cal_an = 0;           /* re-analyse counter during calibration
  * the flukiest window" operator. It latches a frequency on 11/15 controls, and on
  * the dev tablet a steady hand got 3.5, then 4, then 10 Hz on consecutive runs.
  *
- * The peak strength carries no usable PD/control signal as shipped: AUC 0.36–0.40
- * raw (0.5 is chance, and BELOW 0.5 means the controls actually scored higher). A
- * 2.5 Hz high-pass ahead of the FFT does lift it to 0.61–0.74 — the detector is
- * not hopeless, it is unbuilt — but that rests on 15 controls in an offline spiral
- * task and has never been tried on the live calibration scribble, so nothing here
- * relies on it (v3+ work). The honest output for almost every hand is therefore
+ * The peak strength carried no usable PD/control signal BEFORE the high-pass:
+ * AUC 0.395 and 0.358 raw (0.5 is chance, and BELOW 0.5 means the controls
+ * actually scored higher). The 2.5 Hz high-pass ahead of the FFT SHIPS
+ * (TT_HP_HZ in tremor_tracker.h, applied unconditionally in tt_analyze), and
+ * with it analyze_tremor_detect.py scores AUC 0.754 [0.644, 0.856] on the mean
+ * in-band peak strength and 0.690 [0.566, 0.807] on the strongest. Above chance
+ * is still not licence to show anyone a number: an AUC separates two GROUPS,
+ * which is a different claim from "your tremor is X Hz", and on the live
+ * calibration scribble the shipped detector still reports a frequency for 3 of
+ * 20 steady-hand takes. So the honest output for almost every hand remains
  * "no frequency". Requiring the peak in a tenth of the windows and taking the
- * MEDIAN of those gives exactly that (0/15 controls on that set), and still
+ * MEDIAN of those is what produces that, and still
  * reports a real, sustained rhythmic tremor if one is there. Calibration's
  * amplitude path (g_cal_steplen -> preset) is unaffected and is what actually
  * sets the smoothing. */
