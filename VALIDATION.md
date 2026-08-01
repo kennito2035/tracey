@@ -8,6 +8,16 @@ Parkinson's patients** (plus 15 controls) from a published clinical spiral-drawi
 *The same real Parkinson's stroke drawn twice, in sync: the raw pen tip (left) shakes; Tracey's
 (right) glides. This is the live experience: Tracey sits between the pen and the app.*
 
+![Animated: the same comparison on a straight stroke](validation_demo2.gif)
+
+*A straight line is the other thing people try with a pen, and it shows the effect more plainly
+than a spiral does to anyone who has not seen a spiral test. **This stroke is synthetic**, not a
+patient recording: the dataset contains no straight-line task, so the intended path is generated
+and the tremor added on top, exactly as the practice pad's "Pretend my hand shakes" does. It is an
+illustration of the filter's behaviour and carries no claim about anyone's hand. Note the filtered
+line still waves: Tracey reduces tremor, it does not infer that a straight line was intended.
+Regenerate with `python src/make_validation_gif2.py`.*
+
 For a closer look at exactly what gets removed:
 
 ![Tracey on real Parkinson's spiral drawings](validation_spiral.png)
