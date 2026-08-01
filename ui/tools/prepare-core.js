@@ -22,7 +22,13 @@ const { execFileSync } = require('child_process');
 const UI = path.resolve(__dirname, '..');
 const OUT = path.join(UI, 'build', 'core');
 
-// Every layout the core is built into, most specific first.
+// Every layout the core is built into. Order is no longer what decides: a machine
+// that carries BOTH the private development tree and a clone of this repo has a
+// dist/ in each, and taking the first match meant a months-old core from the other
+// tree could shadow the one just built. That is not hypothetical, it shipped an
+// installer containing the exact stale core the release existed to replace, and
+// every check passed: the stale core is signed, valid, and the right filename, so
+// the signature gate below cannot see it. Only its CONTENT was wrong.
 const CANDIDATES = [
   path.resolve(UI, '..', '..', 'dist'),   // dev checkout: <root>/dist, from v3/build.ps1
   path.resolve(UI, '..', 'dist'),         // handoff repo: <repo>/dist, from src/build.ps1
@@ -34,11 +40,37 @@ function die(msg) {
   process.exit(1);
 }
 
-const dir = CANDIDATES.find((d) => fs.existsSync(path.join(d, 'tracey.exe')));
-if (!dir) {
+// Pick the most recently built core, not the first one found, and show the work.
+// Printing only the winner is what made the shadowing invisible: the output looked
+// exactly the same whichever tree it came from.
+const found = CANDIDATES
+  .map((d) => ({ dir: d, exe: path.join(d, 'tracey.exe') }))
+  .filter((c) => fs.existsSync(c.exe))
+  .map((c) => {
+    const st = fs.statSync(c.exe);
+    return Object.assign(c, { mtime: st.mtimeMs, size: st.size });
+  })
+  .sort((a, b) => b.mtime - a.mtime);
+
+if (!found.length) {
   die('could not find a built tracey.exe. Looked in:\n  ' + CANDIDATES.join('\n  ') +
       '\nBuild the core first (ELEVATED PowerShell): cd v3 ; .\\build.ps1');
 }
+
+if (found.length > 1) {
+  console.log('prepare-core: %d built cores found, using the newest:', found.length);
+  found.forEach((c, i) => {
+    console.log('  %s %s  %d bytes  %s',
+      i === 0 ? 'USING ' : 'skip  ', new Date(c.mtime).toISOString(), c.size, c.exe);
+  });
+  const stale = Math.round((found[0].mtime - found[found.length - 1].mtime) / 86400000);
+  if (stale >= 1) {
+    console.log('prepare-core: NOTE the oldest is %d day(s) behind. If that is the one you', stale);
+    console.log('              meant to ship, delete or rename the newer file and re-run.');
+  }
+}
+
+const dir = found[0].dir;
 
 const exe = path.join(dir, 'tracey.exe');
 const cer = path.join(dir, 'TraceyDevSigning.cer');
