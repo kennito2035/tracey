@@ -114,6 +114,7 @@ README.md            this file
 VALIDATION.md        real-patient validation: before/after figure + GIF, numbers, reproducibility
 validation_spiral.png  static hero (real PD spiral: raw vs Tracey, overlaid + zoom)
 validation_demo.gif    animated before/after (raw shaky pen vs Tracey, drawn in sync)
+validation_demo2.gif   the same on a straight stroke (SYNTHETIC tremor, not a patient recording)
 ui/                  the cross-platform UI (Electron): tray, settings, calibration wizard
   electron/            main process + core-comms.js (the ONLY place that talks to the core)
   renderer/            settings window, calibration wizard, live preview
