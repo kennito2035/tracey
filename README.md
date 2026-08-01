@@ -51,8 +51,8 @@ hand shakes when they use a pen** and who wants to keep working independently.
   the case that matters most: it takes the pen through Windows Ink like everything else, so
   it needs nothing special from us.
 - **61 Parkinson's patients + 15 controls** ([UCI Parkinson disease spiral drawings](https://archive.ics.uci.edu/dataset/395/parkinson+disease+spiral+drawings+using+digitized+graphics+tablet), pen X/Y at either 111
-  or 143 Hz depending on the recording; the archive's duplicate folder excluded, not merely
-  hashed): Parkinson's tremor is **~3.5× a steady hand's** deviation, and Tracey removes
+  or 143 Hz depending on the recording; the Static-Spiral segments of the archive's
+  `hw_dataset` and `new_dataset`): Parkinson's tremor is **~3.5× a steady hand's** deviation, and Tracey removes
   **~19% of the 4–8 Hz band** a neurologist would name, the clinical tremor range, at the
   Steadiest preset. We also measured, honestly, what it *can't* do:
   it does **not** correct large-scale drift (92% of it is <2 Hz and overlaps intended motion:

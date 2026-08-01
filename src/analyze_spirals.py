@@ -27,22 +27,20 @@ def _find_data():
             return c
     return os.path.join(HERE, "data")   # default (data is gitignored; place it here)
 DATA = _find_data()
-# The archive's "Improved Spiral Test" folder is EXCLUDED, not deduplicated.
+# GROUPS reads hw_dataset and new_dataset from the UCI archive VALIDATION.md links, and
+# nothing else. The corpus is therefore exactly the files on disk: 15 control and 62 PD
+# Static-Spiral drawings, of which 61 PD have a usable segment (one file's is empty),
+# matching UCI's own description of 62 Parkinson's and 15 healthy participants.
 #
-# It is a second copy of the base set, and MD5 dedup is not enough to catch it. Five of
-# its fifteen "Healthy" files are the SAME five control subjects' same drawings with a
-# handful of extra trailing samples, so they are not byte-identical and survived the
-# hash - inflating the control arm from 15 subjects to 20. The pairing is unambiguous:
-# C_0001/Healthy (1), C_0002/(2), C_0005/(5), C_0006/(6), C_0007/(7), each with
-# identical Static-Spiral starting coordinates and sample counts within 0.6%.
-#
-# Excluding the folder outright makes the corpus exactly match UCI's own description of
-# the dataset - 62 Parkinson's subjects and 15 healthy controls - of which 61 PD have a
-# usable Static Spiral Test (one file's segment is empty).
-#
-# Cost of the old behaviour, for the record: control 4-8 Hz reduction read 4.9% instead
-# of 16.3%, and the <2 Hz share 79.1% instead of 91.6%. No PD figure was affected, since
-# every duplicate in the parkinson arm WAS byte-identical and the hash caught it.
+# unique_files() below hashes anyway, and against THIS archive it drops nothing. It is
+# kept as a guard, not because the archive contains duplicates. History, so nobody
+# reintroduces the confusion: an earlier revision of this script also globbed a SECOND,
+# separately downloaded archive named after the source paper ("Improved spiral test using
+# digitized graphics tablet"), which really was a copy of the base set with five
+# near-duplicate "Healthy" files that MD5 could not catch (extra trailing samples). That
+# archive is no longer used, and the folder it refers to does not exist inside the linked
+# download. Cost of the old behaviour while it was in: control 4-8 Hz reduction read 4.9%
+# instead of 16.3%, and the <2 Hz share 79.1% instead of 91.6%; no PD figure was affected.
 GROUPS = {
     "control": [
         "parkinson+disease+spiral+drawings+using+digitized+graphics+tablet/hw_dataset/control/*.txt",

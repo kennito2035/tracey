@@ -23,12 +23,18 @@ The [Isenkul/Sakar Parkinson spiral dataset](https://archive.ics.uci.edu/dataset
 (digitizing tablet; pen X/Y sampled at either **111 Hz or 143 Hz** depending on the recording:
 26 of the 76 drawings use the slower clock and 50 the faster, with nothing in between). Patients
 trace a printed Archimedean spiral, a
-standard clinical test for hand tremor. The download ships an "Improved Spiral Test" folder that is
-a second copy of the base set, so we exclude it, and hashing alone is not enough to catch it, since
-five of its "Healthy" files are the same five control subjects' same drawings with a few extra
-trailing samples. Excluding it leaves a **unique corpus of 61 PD + 15 control** Static-Spiral
-drawings, matching the dataset's own description of 62 Parkinson's and 15 healthy participants (one
-PD file has an empty Static-Spiral segment).
+standard clinical test for hand tremor. The archive linked above holds `hw_dataset`,
+`hw_drawings` and `new_dataset`; the analysis reads the Static-Spiral segments of
+`hw_dataset` and `new_dataset` and nothing else. That gives a **corpus of 61 PD + 15 control**
+Static-Spiral drawings, matching the dataset's own description of 62 Parkinson's and 15 healthy
+participants (one PD file has an empty Static-Spiral segment).
+
+An earlier revision of this document described excluding a duplicate "Improved Spiral Test"
+folder shipped inside that download, with five near-duplicate control files that MD5 could not
+catch. That folder is **not** in the archive linked here: it was a second, separately downloaded
+archive named after the source paper ("Improved spiral test using digitized graphics tablet"),
+and it is no longer used at all. Against the archive above the hash-dedup step in
+`analyze_spirals.py` removes nothing, and the counts are simply the files on disk.
 
 ## What Tracey does, measured
 Fitting each drawing's *intended* spiral and comparing raw vs. filtered pen paths:
