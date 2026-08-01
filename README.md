@@ -53,7 +53,8 @@ hand shakes when they use a pen** and who wants to keep working independently.
 - **61 Parkinson's patients + 15 controls** ([UCI Parkinson disease spiral drawings](https://archive.ics.uci.edu/dataset/395/parkinson+disease+spiral+drawings+using+digitized+graphics+tablet), pen X/Y at either 111
   or 143 Hz depending on the recording; the archive's duplicate folder excluded, not merely
   hashed): Parkinson's tremor is **~3.5× a steady hand's** deviation, and Tracey removes
-  **~10% of stroke jitter**, the visible shake. We also measured, honestly, what it *can't* do:
+  **~19% of the 4–8 Hz band** a neurologist would name, the clinical tremor range, at the
+  Steadiest preset. We also measured, honestly, what it *can't* do:
   it does **not** correct large-scale drift (92% of it is <2 Hz and overlaps intended motion:
   an intent model, not a filter; see Roadmap). **→ [VALIDATION.md](VALIDATION.md)** for the
   before/after figure, the numbers, and how to reproduce them.

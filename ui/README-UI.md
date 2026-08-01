@@ -220,4 +220,7 @@ under that name wastes a take.
 
 The percentage under the pad is path-length reduction in this preview window
 only. Do not quote it as a result: the real number is in `VALIDATION.md`
-(~10% stroke jitter removed, 61 patients and 15 controls).
+(~19% of the 4–8 Hz clinical tremor band removed at Steadiest, 61 patients
+and 15 controls). Note that VALIDATION's 10% row is TOTAL path length
+including the spiral itself, which that document explicitly warns against
+quoting as shake removed.
