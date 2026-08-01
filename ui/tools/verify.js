@@ -434,7 +434,14 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;FAILED.push
  const stale=core.readStatus();
  const ageMs=Date.now()-fs.statSync(path.join(SCRATCH,'status.cfg')).mtimeMs;
  t('killed core leaves running=1 in the file', Number(stale.raw.running)===1);
- t('heartbeat stops advancing after kill', Number(stale.raw.heartbeat)===hb2);
+ // hb2 was sampled BEFORE the kill, and the mock's independent 200 ms writer
+ // can land one more write in the few ms between that sample and
+ // TerminateProcess, so strict equality with hb2 was a latent race. Frozen
+ // is proven by two post-kill reads agreeing (staleness already proved no
+ // write for 3 s) and by the counter never moving backwards.
+ const hbDead=Number(stale.raw.heartbeat);
+ t('heartbeat stops advancing after kill',
+   hbDead>=hb2 && Number(core.readStatus().raw.heartbeat)===hbDead);
  t('status.cfg goes stale (>3s)', ageMs>3000);
  // THE requirement this suite exists to enforce.
  t('UI reports a killed core as NOT running', stale.running===0 && stale.stale===true);
