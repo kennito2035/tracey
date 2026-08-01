@@ -7,7 +7,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Hackathon](https://img.shields.io/badge/Assistive%20Innovation-Challenge%202026-orange.svg)]()
-[![Download](https://img.shields.io/badge/Download-Tracey--Setup--0.1.0.exe-blue.svg)](https://github.com/kennito2035/tracey/releases/latest)
+[![Download](https://img.shields.io/badge/Download-latest%20release-blue.svg)](https://github.com/kennito2035/tracey/releases/latest)
 
 **Tracey makes drawing and handwriting usable again for people with hand tremor, in the
 apps they already use.**
