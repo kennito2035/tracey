@@ -1,6 +1,6 @@
 {
   "name": "tracey-ui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Steadies pen and tablet input for people with a hand tremor",
   "author": "Tracey",
   "main": "electron/main.js",
