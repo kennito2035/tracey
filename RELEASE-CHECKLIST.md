@@ -42,6 +42,15 @@ green checks twice).
    verify.js proves the UI side against a mock only; the smoke test is the
    only thing that proves the real core.
 
+7. Schedule the Electron runtime upgrade. npm audit shows the shipped
+   electron 32.3.3 carries high-severity runtime advisories (use-after-free
+   in permission callbacks GHSA-8337-3p73-46f4, offscreen paint
+   GHSA-532v-xpq5-8h95, PowerMonitor on Windows GHSA-jjp3-mq3x-295m, renderer
+   switch injection GHSA-9wfr-w7mm-pc7f); the fix line is electron 43.2.0, a
+   major bump that needs its own test pass. Every other advisory in the audit
+   is build-toolchain only and does not ship. Not a blocker for this merge;
+   do not let it age past the next release.
+
 Staged push for the branch (do not run until every gate in the pre-push run
 is green and the run's final report says ready):
 
