@@ -116,7 +116,14 @@ they do not have is an accessibility failure, not a feature.
 - Full keyboard navigation with a visible 3 px focus ring at 3 px offset.
 - The switch is a real `role="switch"` with `aria-checked`; presets are
   `aria-pressed`; the progress bar reports `aria-valuenow`.
-- Status changes announce through `aria-live="polite"` regions.
+- Status changes announce through `aria-live="polite"` regions: the hero, which
+  is where you learn whether your pen is being steadied, and the calibration
+  dialog's progress message. The hero one matters most because it changes for
+  reasons outside the window (the core stopping, the tablet being unplugged, a
+  global hotkey). Without it a screen-reader user heard only the control they
+  themselves pressed, so an unplugged tablet was announced by nothing at all.
+  Errors use `role="alert"` instead, which interrupts, because those need
+  answering now.
 - Dialogs use the native `<dialog>` element, so focus trapping and Escape are
   handled by the browser rather than by hand-written script.
 - **Every animation is disabled under `prefers-reduced-motion`**, including the
