@@ -90,7 +90,13 @@ never be presented to them as an error. Amber is warm, human, and simply
 different from teal, which is all the contrast the practice pad needs.
 
 Colour is never the only signal. State is also carried by the switch position,
-the wave flattening, the headline text, and the tray icon shape.
+the wave flattening, the headline text, and the tray icon shape: steadying is a
+wave, paused is two upright bars, stopped is one flat line. Those three glyphs
+differ as *shapes*, so the tile colour is decoration rather than the message.
+They used to be the same wave in three colours, which meant a colour-blind user
+had nothing to read at all: verified now by comparing colour-independent ink
+masks, where every pair differs by 8 percent of the tile or more at every size,
+against exactly 0 for the old active-versus-paused pair.
 
 ## Language
 

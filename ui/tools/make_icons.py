@@ -1,8 +1,22 @@
 #!/usr/bin/env python3
 """Generate tracey tray icons (no third-party deps).
 
-Mark: a rounded tile in the state colour with a smooth wave cut through it.
-Reads clearly at 16px, which is what the Windows notification area actually uses.
+Mark: a rounded tile in the state colour with a glyph cut through it.
+
+EACH STATE HAS ITS OWN GLYPH, not just its own colour. The three tiles used to
+carry the same wave and differ only in hue, which meant the one signal
+distinguishing "steadying" from "paused" was colour: unusable for a colour-blind
+user, and directly contrary to ACCESSIBILITY.md's promise that colour is never
+the only signal. Measured before this change: the active and paused ink masks
+were pixel-identical at every size.
+
+  active  the wave, shaky on the left and smoothed toward the right, which is
+          the product in one mark
+  paused  two upright bars, the universal pause symbol
+  off     one flat line: nothing is being steadied
+
+Read at 16px, which is what the Windows notification area actually uses, so the
+shapes have to survive that. They are deliberately coarse for that reason.
 """
 import math
 import os
@@ -40,6 +54,29 @@ def wave_points(size, n=200):
     return pts
 
 
+def pause_bars(size):
+    """Two upright bars. Separation is generous because at 16px the gap between
+    them is about 2px, and anything tighter closes up under anti-aliasing."""
+    return [
+        [(0.35 * size, 0.30 * size), (0.35 * size, 0.70 * size)],
+        [(0.65 * size, 0.30 * size), (0.65 * size, 0.70 * size)],
+    ]
+
+
+def flat_line(size):
+    """One straight line: no stroke is being steadied because nothing is running."""
+    return [[(0.18 * size, 0.5 * size), (0.82 * size, 0.5 * size)]]
+
+
+def glyph_for(state, size):
+    """(polylines, stroke radius) for a state. Drawn ink is 2 * stroke wide."""
+    if state == "paused":
+        return pause_bars(size), max(1.1, size * 0.075)
+    if state == "off":
+        return flat_line(size), max(1.15, size * 0.085)
+    return [wave_points(size)], max(1.15, size * 0.085)
+
+
 def dist_to_polyline(px, py, pts):
     best = 1e9
     for i in range(len(pts) - 1):
@@ -55,10 +92,13 @@ def dist_to_polyline(px, py, pts):
     return math.sqrt(best)
 
 
-def render(size, rgb):
+def dist_to_glyph(px, py, polys):
+    return min(dist_to_polyline(px, py, p) for p in polys)
+
+
+def render(size, rgb, state="active"):
     tile = rounded_rect(size * 0.06, size * 0.06, size * 0.88, size * 0.88, size * 0.26)
-    pts = wave_points(size)
-    stroke = max(1.15, size * 0.085)
+    polys, stroke = glyph_for(state, size)
     px = bytearray()
     for y in range(size):
         px.append(0)  # filter byte
@@ -71,7 +111,7 @@ def render(size, rgb):
                     fy = y + (sy + 0.5) / SS
                     if tile(fx, fy):
                         cov_tile += 1
-                        if dist_to_polyline(fx, fy, pts) <= stroke:
+                        if dist_to_glyph(fx, fy, polys) <= stroke:
                             cov_wave += 1
             n = SS * SS
             a_tile = cov_tile / n
@@ -104,8 +144,10 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     for name, rgb in STATES.items():
         for size in (16, 24, 32, 48):
-            write_png(os.path.join(OUT, f"tray-{name}-{size}.png"), size, render(size, rgb))
-    write_png(os.path.join(OUT, "icon.png"), 256, render(256, STATES["active"]))
+            write_png(os.path.join(OUT, f"tray-{name}-{size}.png"), size,
+                      render(size, rgb, name))
+    # The app icon stays the wave: it is the product mark, not a state.
+    write_png(os.path.join(OUT, "icon.png"), 256, render(256, STATES["active"], "active"))
     print("wrote icons to", os.path.normpath(OUT))
 
 
