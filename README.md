@@ -39,8 +39,9 @@ hand shakes when they use a pen** and who wants to keep working independently.
    input system-wide).
 2. **Filter** the X/Y path with the **one-euro filter** (Casiez et al., 2012), an adaptive
    low-pass that removes tremor jitter while staying responsive to fast, intentional motion.
-   Pressure passes through unfiltered; tilt is not forwarded in this version, so
-   tilt-aware brushes lose tilt while Tracey is on.
+   Pressure and tilt pass through unfiltered: only X/Y are smoothed, so tilt-aware
+   brushes keep the angle the tablet reported. Tilt is forwarded only when the pen
+   actually reports it, never invented.
 3. **Re-inject** the smoothed stroke so the app underneath receives a clean line. An FFT
    **tremor-frequency tracker** also runs during calibration, but it is *not* in the default
    filter path and has no user-facing readout: on real patient data it does not reliably
@@ -130,6 +131,8 @@ src/                 the native-C core
   test_tracker.c       unit test for the tremor tracker
   test_notch.c         notch vs one-euro comparison (synthetic, two regimes)
   test_latency.c       the added-latency table in VALIDATION.md
+  test_tilt.c          pen tilt forwarding, against the real inject() (stubs the
+                       injection call, so it needs no tablet)
   analyze_spirals.py, analyze_tremor_detect.py, make_validation_figure.py,
   make_validation_gif.py   real-data analysis (reproduces VALIDATION.md)
 packaging/           uiaccess_manifest.xml (requireAdministrator + uiAccess),
