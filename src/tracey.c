@@ -578,7 +578,21 @@ static void apply_preset(int i) {
     for (int b = 0; b <= i; b++) { MessageBeep(MB_OK); Sleep(120); }
 }
 
-static void inject(int x, int y, POINTER_FLAGS flags, UINT32 pressure) {
+/* Tilt forwarding, and the switch that gives up on it.
+ *
+ * A stroke matters more than its tilt. If some machine refuses an injection
+ * that carries tilt, dropping the sample would break the line the user is
+ * drawing, which is far worse than losing the angle, so the first such failure
+ * retries without tilt and latches forwarding off for the rest of the session
+ * (with a log line naming the error). Injecting tilt cannot be tested on a
+ * machine with no pen tablet, so it does not get to fail silently either. */
+static int      g_tilt_fwd  = 1;   /* 0 once the fallback below has fired */
+static unsigned g_tilt_sent = 0;   /* injections that actually carried tilt */
+
+static int clamp_tilt(INT32 v) { return v < -90 ? -90 : (v > 90 ? 90 : (int)v); }
+
+static void inject(int x, int y, POINTER_FLAGS flags, UINT32 pressure,
+                   const POINTER_PEN_INFO *src) {
     POINTER_TYPE_INFO pti;
     ZeroMemory(&pti, sizeof(pti));
     pti.type = PT_PEN;
@@ -591,15 +605,47 @@ static void inject(int x, int y, POINTER_FLAGS flags, UINT32 pressure) {
     /* 0 pressure + INCONTACT is invalid, so clamp only while in contact; a hovering
      * pen must report 0 or it looks like it is touching the surface. */
     pti.penInfo.pressure = (flags & POINTER_FLAG_INCONTACT) ? (pressure ? pressure : 1) : 0;
+    /* Tilt passes through UNFILTERED: the one-euro filter smooths X/Y only, and a
+     * tilt-aware brush needs the angle the tablet actually reported. Forwarded
+     * only when the source reported it (never invented), and clamped to the
+     * documented -90..90 so a rogue value cannot fail the whole call. Rotation
+     * and barrel pressure are deliberately NOT forwarded: nothing here measures
+     * them, so nothing claims them. */
+    int withTilt = 0;
+    if (g_tilt_fwd && src) {
+        if (src->penMask & PEN_MASK_TILT_X) {
+            pti.penInfo.penMask |= PEN_MASK_TILT_X;
+            pti.penInfo.tiltX = clamp_tilt(src->tiltX);
+            withTilt = 1;
+        }
+        if (src->penMask & PEN_MASK_TILT_Y) {
+            pti.penInfo.penMask |= PEN_MASK_TILT_Y;
+            pti.penInfo.tiltY = clamp_tilt(src->tiltY);
+            withTilt = 1;
+        }
+    }
     LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0);
     BOOL ok = InjectSyntheticPointerInput(g_dev, &pti, 1);
     QueryPerformanceCounter(&t1);
     /* Timing telemetry: if this call is slow it starves our message loop, and
-     * Windows then paints the busy cursor while our window is the pen target. */
+     * Windows then paints the busy cursor while our window is the pen target.
+     * Measured around the FIRST call only, so the one-off tilt retry below
+     * cannot distort inject_avg. */
     double us = (double)(t1.QuadPart - t0.QuadPart) * 1e6 / (double)g_qpf.QuadPart;
     g_injUs_total += us; g_injN++;
     if (us > g_injUs_max) g_injUs_max = us;
-    if (ok) g_injOk++;
+    if (!ok && withTilt) {
+        DWORD err = GetLastError();
+        pti.penInfo.penMask = PEN_MASK_PRESSURE;
+        pti.penInfo.tiltX = pti.penInfo.tiltY = 0;
+        ok = InjectSyntheticPointerInput(g_dev, &pti, 1);
+        if (ok) {
+            g_tilt_fwd = 0;
+            LOGF("tilt injection refused (err=%lu) -- forwarding pressure only from now on\n", err);
+        }
+        withTilt = 0;
+    }
+    if (ok) { g_injOk++; if (withTilt) g_tilt_sent++; }
     else { g_injFail++; LOGF("inject FAIL (%d,%d) err=%lu\n", x, y, GetLastError()); }
 }
 
@@ -622,7 +668,7 @@ static void calib_sample(UINT32 id) {
      * underneath. Raw rather than smoothed - this is feedback, not output, and it
      * costs the measurement nothing either way. */
     if (g_dev) {
-        inject(x, y, POINTER_FLAG_UPDATE | POINTER_FLAG_INRANGE | POINTER_FLAG_PRIMARY, 0);
+        inject(x, y, POINTER_FLAG_UPDATE | POINTER_FLAG_INRANGE | POINTER_FLAG_PRIMARY, 0, &ppi);
         g_hover++;
     }
 
@@ -752,7 +798,7 @@ static void on_pen(UINT msg, WPARAM wParam) {
         int fy = iround(oneeuro_filter(&g_fy, ny, t));
         stat_update(rx, ry, fx, fy);
         inject(fx + DIAG_OFFSET_X, fy, POINTER_FLAG_DOWN | POINTER_FLAG_INRANGE |
-                       POINTER_FLAG_INCONTACT | POINTER_FLAG_PRIMARY, pressure);
+                       POINTER_FLAG_INCONTACT | POINTER_FLAG_PRIMARY, pressure, &ppi);
         g_real++;
         break;
     }
@@ -763,7 +809,7 @@ static void on_pen(UINT msg, WPARAM wParam) {
             int fy = iround(oneeuro_filter(&g_fy, ny, t));
             stat_update(rx, ry, fx, fy);
             inject(fx + DIAG_OFFSET_X, fy, POINTER_FLAG_UPDATE | POINTER_FLAG_INRANGE |
-                           POINTER_FLAG_INCONTACT | POINTER_FLAG_PRIMARY, pressure);
+                           POINTER_FLAG_INCONTACT | POINTER_FLAG_PRIMARY, pressure, &ppi);
             g_real++;
         } else {
             /* HOVER. RPIT has already taken the raw pen away from the system, so if
@@ -775,7 +821,7 @@ static void on_pen(UINT msg, WPARAM wParam) {
             int fx = iround(oneeuro_filter(&g_fx, rx, t));
             int fy = iround(oneeuro_filter(&g_fy, ry, t));
             inject(fx + DIAG_OFFSET_X, fy,
-                   POINTER_FLAG_UPDATE | POINTER_FLAG_INRANGE | POINTER_FLAG_PRIMARY, 0);
+                   POINTER_FLAG_UPDATE | POINTER_FLAG_INRANGE | POINTER_FLAG_PRIMARY, 0, &ppi);
             g_hover++;
         }
         break;
@@ -786,7 +832,7 @@ static void on_pen(UINT msg, WPARAM wParam) {
          * Without this the pointer is destroyed on every stroke end and the cursor
          * disappears until the next contact. */
         inject(fx + DIAG_OFFSET_X, fy,
-               POINTER_FLAG_UP | POINTER_FLAG_INRANGE | POINTER_FLAG_PRIMARY, 0);
+               POINTER_FLAG_UP | POINTER_FLAG_INRANGE | POINTER_FLAG_PRIMARY, 0, &ppi);
         g_real++;
         break;
     }
@@ -1167,6 +1213,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     double reduction = (g_rawlen > 0.0) ? (100.0 * (g_rawlen - g_filtlen) / g_rawlen) : 0.0;
     LOGF("stop real=%u hover=%u injOk=%u injFail=%u sentinel=%u\n",
          g_real, g_hover, g_injOk, g_injFail, g_sentinel);
+    /* Tilt cannot be verified without a tilt-capable pen, so the log says what
+     * actually happened: sent=0 with a tablet attached means the device never
+     * reported tilt, which is a different fact from the forwarding being off. */
+    LOGF("tilt forwarded=%s sent=%u\n", g_tilt_fwd ? "yes" : "disabled-after-refusal", g_tilt_sent);
     LOGF("pathlen raw=%.0f filt=%.0f reduction=%.1f%% maxdev=%.1f\n", g_rawlen, g_filtlen, reduction, g_maxdev);
     LOGF("latency inject_avg=%.0fus inject_max=%.0fus n=%u | pen_gap_avg=%.1fms pen_gap_max=%.1fms n=%u\n",
          g_injN ? g_injUs_total / g_injN : 0.0, g_injUs_max, g_injN,
