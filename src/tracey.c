@@ -1005,8 +1005,11 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     g_pen_present = detect_pen();   /* so the very first status.cfg carries it */
     g_pen_probe = g_pen_present;
     /* Off-heartbeat re-probing: see pen_probe_thread. If the thread cannot
-     * start, presence just stays at the startup answer; liveness is fine. */
+     * start, presence just stays at the startup answer; liveness is fine,
+     * but say so: a silently frozen pen readout would be undiagnosable. */
     g_pen_thread = (HANDLE)_beginthreadex(NULL, 0, pen_probe_thread, NULL, 0, NULL);
+    if (!g_pen_thread)
+        LOGF("pen probe thread failed to start (errno=%d): presence stays at the startup answer\n", errno);
 
     /* Fullscreen (virtual desktop) layered+transparent+topmost overlay. */
     WNDCLASSW wc; ZeroMemory(&wc, sizeof(wc));
