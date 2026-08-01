@@ -164,10 +164,13 @@ If a machine ever refuses an injection carrying tilt, the call is retried once
 without it and forwarding latches off for the session (logged), because losing an
 angle beats dropping the sample and breaking the stroke.
 
-Build/run: `cl /nologo /O2 /I . test_tilt.c /Fe:test_tilt.exe` then run. It rewrites
-only tracey.c's call to `InjectSyntheticPointerInput` to a stub, so it exercises the
-real `inject()` and needs no tablet. `TILT_OFF=1` is a negative control: it disables
-forwarding, and the suite must then FAIL.
+Build/run:
+`cl /nologo /O2 /I . test_tilt.c /Fe:test_tilt.exe /link user32.lib setupapi.lib cfgmgr32.lib`
+then run. Unlike the other three tests this one compiles tracey.c itself, so it needs
+the same three libraries build.ps1 links; without them it fails with 29 unresolved
+externals. It rewrites only tracey.c's call to `InjectSyntheticPointerInput` to a stub,
+so it exercises the real `inject()` and needs no tablet. `TILT_OFF=1` is a negative
+control: it disables forwarding, and the suite must then FAIL.
 
 What this cannot prove: that Windows delivers the forwarded tilt to a real app. That
 needs a tilt-capable pen and the signed core, so it belongs in the release smoke test.
