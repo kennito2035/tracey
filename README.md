@@ -131,6 +131,8 @@ src/                 the native-C core
   test_tracker.c       unit test for the tremor tracker
   test_notch.c         notch vs one-euro comparison (synthetic, two regimes)
   test_latency.c       the added-latency table in VALIDATION.md
+  test_tilt.c          pen tilt forwarding, against the real inject() (stubs the
+                       injection call, so it needs no tablet)
   analyze_spirals.py, analyze_tremor_detect.py, make_validation_figure.py,
   make_validation_gif.py   real-data analysis (reproduces VALIDATION.md)
 packaging/           uiaccess_manifest.xml (requireAdministrator + uiAccess),

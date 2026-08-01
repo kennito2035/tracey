@@ -154,6 +154,24 @@ notching it would delete real strokes; that gap still needs the classifier. `--n
 experimental: the DSP is validated on synthetic signals, but the notch Q and the calibration
 thresholds need tuning on real tremor hardware before it could become the default.
 
+### Pen tilt forwarding (`test_tilt.c`)
+
+The injected stroke carries the tilt the tablet reported, unfiltered: only X/Y go
+through the one-euro filter, so a tilt-aware brush keeps its angle. Tilt is set only
+for the axes the pen actually reports, clamped to the documented -90..90.
+
+If a machine ever refuses an injection carrying tilt, the call is retried once
+without it and forwarding latches off for the session (logged), because losing an
+angle beats dropping the sample and breaking the stroke.
+
+Build/run: `cl /nologo /O2 /I . test_tilt.c /Fe:test_tilt.exe` then run. It rewrites
+only tracey.c's call to `InjectSyntheticPointerInput` to a stub, so it exercises the
+real `inject()` and needs no tablet. `TILT_OFF=1` is a negative control: it disables
+forwarding, and the suite must then FAIL.
+
+What this cannot prove: that Windows delivers the forwarded tilt to a real app. That
+needs a tilt-capable pen and the signed core, so it belongs in the release smoke test.
+
 ## What's parked, and why
 
 The **intention-vs-tremor classifier** (turn a shaky intended-straight line straight) is parked

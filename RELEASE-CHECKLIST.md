@@ -42,6 +42,15 @@ green checks twice).
    verify.js proves the UI side against a mock only; the smoke test is the
    only thing that proves the real core.
 
+   Add one step for tilt, which is new and unproven on hardware: draw in a
+   tilt-aware brush (Photoshop, Krita or Fresco) with Tracey ON and confirm the
+   brush responds to pen angle, then check tracey.log at shutdown. The line
+   `tilt forwarded=yes sent=N` with N greater than 0 is the proof it flowed;
+   `sent=0` with a tilt-capable pen attached means the device never reported
+   tilt, and `forwarded=disabled-after-refusal` means Windows rejected it and
+   Tracey fell back to pressure only. src/test_tilt.c covers the logic without
+   a tablet, but only this step proves the app receives the angle.
+
 7. Schedule the Electron runtime upgrade. npm audit shows the shipped
    electron 32.3.3 carries high-severity runtime advisories (use-after-free
    in permission callbacks GHSA-8337-3p73-46f4, offscreen paint
