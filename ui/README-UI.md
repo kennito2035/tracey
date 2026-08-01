@@ -148,8 +148,12 @@ pen is unfiltered.
 process exits. Because a stale `quit=1` would make the next launched core exit
 immediately, every ordinary write from the UI omits the key, which clears it.
 
-The main window's big switch starts and stops the core. The Advanced panel has a
-second switch for it (`#coreSwitch`). The tray, which exists only while the core
+The main window's big switch starts the core if it is not running, and PAUSES it
+from then on: it writes `enabled=0`, never `quit=1`, so the process stays up and
+resuming costs no UAC prompt. Stopping it outright lives in the Advanced panel's
+second switch (`#coreSwitch`), in the tray's Quit, and in app shutdown. The
+window's own help text says the same thing, so a doc that said "starts and stops"
+contradicted both the code and the screen. The tray, which exists only while the core
 does, offers **Steady my pen**, **Pause Tracey**, **Calibrate my tremor…**, then
 **Open Tracey**, **Open settings folder** and **Quit Tracey**.
 
@@ -203,10 +207,11 @@ change.
 This is assistive tech, so the UI is built for hands that shake: every target is
 at least 44px, both sliders have large `−`/`+` steppers so nobody has to land a
 drag precisely, three named presets plus Custom cover the common cases with one
-click, contrast
-runs above 6:1 throughout, the whole app is keyboard-navigable with visible
+click, every text and control colour clears WCAG AA with body text at AAA (the
+per-pair numbers are in ACCESSIBILITY.md; the lowest is 4.9:1, not the 6:1 this
+paragraph used to claim), the whole app is keyboard-navigable with visible
 focus, status changes announce through `aria-live`, and animation drops out
-under `prefers-reduced-motion`.
+under `prefers-reduced-motion`, pseudo-elements included.
 
 ## Demo notes
 

@@ -43,8 +43,18 @@
       <span class="track"><span class="knob" aria-hidden="true"></span></span>
     </button>
 
-    <h1 id="heroTitle">Getting ready…</h1>
-    <p id="heroText" class="hero-sub">Looking for Tracey on this computer.</p>
+    <!-- The hero is what tells you whether your pen is being steadied, and it
+         changes for reasons OUTSIDE this window: the core stopping, the tablet
+         being unplugged, a hotkey. Without a live region a screen-reader user
+         hears the switch they just pressed and nothing else, so an unplugged
+         tablet is silent. role="status" is the polite one on purpose: these are
+         state reports, not alarms, and interrupting mid-sentence would be worse
+         than waiting. The wrapper carries the region so the title and the
+         sentence under it announce together as one message rather than two. -->
+    <div id="heroStatus" role="status" aria-live="polite">
+      <h1 id="heroTitle">Getting ready…</h1>
+      <p id="heroText" class="hero-sub">Looking for Tracey on this computer.</p>
+    </div>
     <p id="heroError" class="hero-error" role="alert" hidden></p>
   </section>
 

@@ -157,9 +157,12 @@ function updateTray(s) {
   if (!tray) return;
   const state = trayState(s.status);
   const label =
-    state === 'active' ? 'Tracey — steadying your pen'
-    : state === 'paused' ? 'Tracey — paused'
-    : 'Tracey — core not running';
+    // Hover text is user-facing, so it says what the person gets, not what the
+    // process is doing. "core not running" leaked an internal word into the one
+    // place a passing user reads.
+    state === 'active' ? 'Tracey: steadying your pen'
+    : state === 'paused' ? 'Tracey: paused, not steadying'
+    : 'Tracey: not running';
 
   tray.setImage(trayImage(state));
   tray.setToolTip(label);
@@ -385,9 +388,14 @@ async function setEnabled(on) {
   if (needsLaunch) {
     if (!core.coreInstalled()) {
       push();
+      // This lands in the HERO, the largest text in the window, and the person
+      // reading it came here because their hand shakes and their pen will not
+      // behave. Telling them to run a PowerShell script is not help. The path
+      // and the build instruction go to the log, where they are useful to us.
+      core.logUi(`core missing at ${core.paths().exePath} (build.ps1 installs it)`);
       return { ok: false, message:
-        `Tracey is not installed yet. Expected it at ${core.paths().exePath}. ` +
-        `Run build.ps1 from an elevated PowerShell first.` };
+        'Part of Tracey is missing, so it cannot steady your pen yet.\n' +
+        'Running the Tracey installer again will put it back.' };
     }
     // Awaited, not fired and forgotten: launchCore only settles once Windows has
     // answered, so a declined UAC prompt arrives here as a real message.
@@ -400,10 +408,16 @@ async function setEnabled(on) {
       await waitFor((s) => s.running, 15000);
     } catch {
       push();
+      // Smart App Control has to be named: it is a real Windows setting and
+      // there is no plainer way to point at it. But say what turning it off
+      // costs, because Windows only lets it go back on by resetting the PC, and
+      // an app that hides that is not being honest with the person trusting it.
       return { ok: false, message:
-        'Tracey did not start. If Windows asked for permission, choose Yes. ' +
-        'If no prompt appeared, Smart App Control may be blocking it ' +
-        '(Windows Security > App & browser control > Smart App Control > Off).' };
+        'Tracey did not start. If Windows asked for permission, choose Yes and try again.\n' +
+        'If no prompt appeared at all, a Windows feature called Smart App Control ' +
+        'is blocking it. You can turn that off under Windows Security, in ' +
+        'App and browser control. Worth knowing first: once it is off, Windows ' +
+        'cannot turn it back on without resetting the PC.' };
     }
   }
 
@@ -531,7 +545,8 @@ async function startCalibration() {
     try {
       await waitFor((s) => s.calibrating, 6000);
     } catch {
-      throw new Error('Tracey did not begin calibrating. It may be running an older build — reinstall the core with build.ps1.');
+      core.logUi('calibrate=1 was not acknowledged within 6s (core may predate in-process calibration)');
+      throw new Error('Tracey could not start measuring. Installing Tracey again should fix it.');
     }
 
     // 3. clear the one-shot key immediately, or the next slider write re-triggers it

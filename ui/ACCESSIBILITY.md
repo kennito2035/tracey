@@ -90,7 +90,13 @@ never be presented to them as an error. Amber is warm, human, and simply
 different from teal, which is all the contrast the practice pad needs.
 
 Colour is never the only signal. State is also carried by the switch position,
-the wave flattening, the headline text, and the tray icon shape.
+the wave flattening, the headline text, and the tray icon shape: steadying is a
+wave, paused is two upright bars, stopped is one flat line. Those three glyphs
+differ as *shapes*, so the tile colour is decoration rather than the message.
+They used to be the same wave in three colours, which meant a colour-blind user
+had nothing to read at all: verified now by comparing colour-independent ink
+masks, where every pair differs by 8 percent of the tile or more at every size,
+against exactly 0 for the old active-versus-paused pair.
 
 ## Language
 
@@ -110,12 +116,25 @@ they do not have is an accessibility failure, not a feature.
 - Full keyboard navigation with a visible 3 px focus ring at 3 px offset.
 - The switch is a real `role="switch"` with `aria-checked`; presets are
   `aria-pressed`; the progress bar reports `aria-valuenow`.
-- Status changes announce through `aria-live="polite"` regions.
+- Status changes announce through `aria-live="polite"` regions: the hero, which
+  is where you learn whether your pen is being steadied, and the calibration
+  dialog's progress message. The hero one matters most because it changes for
+  reasons outside the window (the core stopping, the tablet being unplugged, a
+  global hotkey). Without it a screen-reader user heard only the control they
+  themselves pressed, so an unplugged tablet was announced by nothing at all.
+  Errors use `role="alert"` instead, which interrupts, because those need
+  answering now.
 - Dialogs use the native `<dialog>` element, so focus trapping and Escape are
   handled by the browser rather than by hand-written script.
 - **Every animation is disabled under `prefers-reduced-motion`**, including the
-  ripples, the switch spring and the breathing glow. Vestibular sensitivity and
-  tremor co-occur often enough that this is not optional.
+  ripples, the switch spring, the breathing glow, and the ones declared on
+  pseudo-elements: the selected-preset checkmark's overshooting bounce, the knob
+  wave crossfades and the Advanced chevron. That last group is easy to miss,
+  because the obvious `* { animation: none }` does not match `::before` or
+  `::after` and leaves exactly the overshoot this rule exists to suppress still
+  playing. `npm run check-motion` proves it in the app's own Electron by reading
+  computed styles with reduced motion emulated. Vestibular sensitivity and tremor
+  co-occur often enough that this is not optional.
 
 ## What we did not do
 
