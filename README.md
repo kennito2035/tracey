@@ -39,7 +39,8 @@ hand shakes when they use a pen** and who wants to keep working independently.
    input system-wide).
 2. **Filter** the X/Y path with the **one-euro filter** (Casiez et al., 2012), an adaptive
    low-pass that removes tremor jitter while staying responsive to fast, intentional motion.
-   Pressure/tilt pass through untouched.
+   Pressure passes through unfiltered; tilt is not forwarded in this version, so
+   tilt-aware brushes lose tilt while Tracey is on.
 3. **Re-inject** the smoothed stroke so the app underneath receives a clean line. An FFT
    **tremor-frequency tracker** also runs during calibration, but it is *not* in the default
    filter path and has no user-facing readout: on real patient data it does not reliably
