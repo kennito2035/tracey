@@ -29,6 +29,8 @@
 #include <cfgmgr32.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <process.h>   /* _beginthreadex: the pen probe runs off the heartbeat */
 #include <string.h>
 #include <wchar.h>
 #include <math.h>
@@ -53,6 +55,7 @@ static int                      g_debug = 0;
 static int                      g_mode  = MODE_FILTER;
 static int                      g_noprompt = 0;  /* --no-prompt: UI drives calibration */
 static FILE                    *g_log = NULL;
+static CRITICAL_SECTION         g_log_cs;   /* serialises LOGF vs close_log */
 static HSYNTHETICPOINTERDEVICE  g_dev = NULL;
 static LARGE_INTEGER            g_qpf;
 static OneEuro                  g_fx, g_fy;
@@ -309,6 +312,49 @@ static int detect_pen(void) {
     return found;
 }
 
+/* The probe runs on its own thread, never on the heartbeat. detect_pen is
+ * usually a few ms, but a device probe can block for seconds while the pen
+ * driver is busy, and the heartbeat is the UI's liveness signal: a probe
+ * stall past ~2 s makes the next status.cfg write late, the UI's 3 s
+ * staleness rule declares this core dead, and the tray is torn down while
+ * the core filters on. The thread publishes into g_pen_probe and the beat
+ * only ever reads it, so a stalled probe can cost pen-presence freshness
+ * but never a heartbeat. */
+static volatile LONG g_pen_probe  = -1;   /* last published probe result */
+static volatile LONG g_pen_stop   = 0;
+static HANDLE        g_pen_thread = NULL;
+
+static unsigned __stdcall pen_probe_thread(void *arg) {
+    (void)arg;
+    while (!g_pen_stop) {
+        LARGE_INTEGER t0, t1, fq;
+        QueryPerformanceCounter(&t0);
+        int pen = detect_pen();
+        QueryPerformanceCounter(&t1); QueryPerformanceFrequency(&fq);
+        {
+            long probe_ms = (long)((t1.QuadPart - t0.QuadPart) * 1000 / fq.QuadPart);
+            if (probe_ms > 500 && !g_pen_stop)
+                LOGF("pen probe took %ld ms (own thread, heartbeat unaffected)\n", probe_ms);
+        }
+        InterlockedExchange(&g_pen_probe, pen);
+        for (int i = 0; i < 10 && !g_pen_stop; i++) Sleep(100);
+    }
+    return 0;
+}
+
+/* Signal and briefly join the probe thread. Called on EVERY exit path that
+ * closes the log: a probe finishing after the close would otherwise try to
+ * log through a freed FILE*. A stalled driver can outlive the join timeout,
+ * which is why close_log's critical section is the second line of defence. */
+static void stop_pen_thread(void) {
+    g_pen_stop = 1;
+    if (g_pen_thread) {
+        WaitForSingleObject(g_pen_thread, 1500);
+        CloseHandle(g_pen_thread);
+        g_pen_thread = NULL;
+    }
+}
+
 /* Temp file + atomic replace. The UI reads profile.cfg on every state push to
  * decide whether the "Custom" card is selectable, so a truncate-and-rewrite let
  * it catch the file empty for an instant and the card flickered enabled/
@@ -371,9 +417,17 @@ static ULONGLONG cfg_mtime(void) {
 static unsigned g_heartbeat = 0;
 
 static void write_status(int running, double tremor_hz) {
-    wchar_t dir[MAX_PATH], path[MAX_PATH];
+    wchar_t dir[MAX_PATH], path[MAX_PATH], tmp[MAX_PATH];
     tt_dir(dir); CreateDirectoryW(dir, NULL); tt_file(path, L"status.cfg");
-    FILE *f = _wfopen(path, L"w");
+    tt_file(tmp, L"status.tmp");
+    /* Temp file + atomic replace, the same pattern calpath_write and
+     * save_profile already use. This is the one file the UI's liveness test
+     * reads: _wfopen(path, L"w") truncates in place, so between open and
+     * fclose the file was legitimately EMPTY, and a reader landing there
+     * parsed no keys, defaulted running to 0, and tore the tray down.
+     * Measured at 50 writes/s against a tight reader: 668 empty reads in
+     * 186,558 with no artificial hold; 0 in 193,362 with this pattern. */
+    FILE *f = _wfopen(tmp, L"w");
     if (f) {
         fprintf(f, "running=%d\nenabled=%d\nfmin=%.4f\nbeta=%.5f\npreset=%d\n"
                    "tremor_hz=%.2f\ncalibrating=%d\ncal_hz=%.2f\ncal_samples=%u\n"
@@ -382,6 +436,36 @@ static void write_status(int running, double tremor_hz) {
                 tremor_hz, g_calibrating, g_cal_hz, g_cal_count,
                 g_pen_present, ++g_heartbeat);
         fclose(f);
+        /* Liveness depends on this landing: a silently dropped replace is a
+         * missed heartbeat. Retry briefly (a reader without FILE_SHARE_DELETE
+         * or an AV filter can hold the destination for a moment). */
+        int ok = 0;
+        for (int i = 0; i < 3; i++) {
+            if (MoveFileExW(tmp, path, MOVEFILE_REPLACE_EXISTING)) { ok = 1; break; }
+            if (i < 2) Sleep(4);
+        }
+        if (!ok) LOGF("status: replace failed err=%lu\n", GetLastError());
+    } else {
+        /* A heartbeat that cannot even open its temp file is a dropped
+         * liveness write: the UI will declare this core dead in 3 s, and
+         * without this line tracey.log would hold no evidence of why. */
+        LOGF("status: could not open status.tmp (errno=%d)\n", errno);
+    }
+    /* Instrumentation for the tray liveness defect: the UI declares this core
+     * dead when status.cfg's age passes 3000 ms, so any gap between
+     * consecutive writes that approaches it is worth a log line. A stalled
+     * heartbeat (for example a slow pen probe on the beat) shows up here as a
+     * LATE write, which no "did every write happen" check would catch. */
+    {
+        static LARGE_INTEGER s_prev;
+        LARGE_INTEGER now, fq;
+        QueryPerformanceCounter(&now); QueryPerformanceFrequency(&fq);
+        if (s_prev.QuadPart) {
+            long ms = (long)((now.QuadPart - s_prev.QuadPart) * 1000 / fq.QuadPart);
+            if (ms > 2500)
+                LOGF("status: %ld ms between status.cfg writes (UI stale threshold 3000)\n", ms);
+        }
+        s_prev = now;
     }
 }
 static int read_config(int *en, double *fm, double *be, int *quit, int *calib) {
@@ -443,9 +527,21 @@ static void poll_config(void) {
     if (changed) { LOGF("config: enabled=%d fmin=%.3f beta=%.4f\n", g_enabled, g_cur_fmin, g_cur_beta); write_status(1, g_notch_seed_hz); }
 }
 
+/* Serialised against close_log: the pen probe thread also logs, and a log
+ * write racing an exit path's fclose would go through a freed FILE*. The
+ * critical section is initialised before the log opens and deliberately
+ * never deleted (static storage outlives every thread). */
 static void LOGF(const char *fmt, ...) {
-    if (!g_log) return;
-    va_list ap; va_start(ap, fmt); vfprintf(g_log, fmt, ap); va_end(ap); fflush(g_log);
+    EnterCriticalSection(&g_log_cs);
+    if (g_log) {
+        va_list ap; va_start(ap, fmt); vfprintf(g_log, fmt, ap); va_end(ap); fflush(g_log);
+    }
+    LeaveCriticalSection(&g_log_cs);
+}
+static void close_log(void) {
+    EnterCriticalSection(&g_log_cs);
+    if (g_log) { fclose(g_log); g_log = NULL; }
+    LeaveCriticalSection(&g_log_cs);
 }
 
 static double now_s(void) {
@@ -847,13 +943,16 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
          * killed one by the file's age. Runs in BOTH modes -- calibration has no poll
          * timer, and a stale status.cfg mid-calibration would look like a dead core. */
         else if (w == HB_TIMER_ID) {
-            /* Re-probe the tablet on every beat. It costs a few ms, so a 1 Hz
-             * re-check is far cheaper than what the UI had to do, and it makes
-             * plug/unplug show up in about a second instead of up to 24. */
-            int pen = detect_pen();
+            /* This beat is the UI's liveness signal, so nothing here may
+             * block. The tablet probe runs on its own thread
+             * (pen_probe_thread) and publishes into g_pen_probe; the beat
+             * only adopts the latest answer. Plug/unplug still shows up in
+             * a second or two instead of the up-to-24 s the UI's own probe
+             * used to cost. */
+            LONG pen = g_pen_probe;
             if (pen >= 0 && pen != g_pen_present)
                 LOGF("pen tablet %s\n", pen ? "connected" : "disconnected");
-            if (pen >= 0) g_pen_present = pen;
+            if (pen >= 0) g_pen_present = (int)pen;
             write_status(1, g_mode == MODE_CALIBRATE ? 0.0 : g_notch_seed_hz);
         }
         return 0;
@@ -876,6 +975,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     g_notch_on = (pCmd && wcsstr(pCmd, L"notch")) ? 1 : 0;
     g_noprompt = (pCmd && wcsstr(pCmd, L"no-prompt")) ? 1 : 0;
 
+    InitializeCriticalSection(&g_log_cs);   /* before the first possible LOGF */
     {
         wchar_t dir[MAX_PATH], path[MAX_PATH];
         tt_dir(dir); CreateDirectoryW(dir, NULL);
@@ -898,11 +998,18 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
         else if (g_debug)
             MessageBoxW(NULL, L"Tracey is already running.", L"Tracey",
                         MB_OK | MB_ICONINFORMATION);
-        if (g_log) fclose(g_log);
+        close_log();   /* the probe thread has not started yet on this path */
         return 3;
     }
     QueryPerformanceFrequency(&g_qpf);
     g_pen_present = detect_pen();   /* so the very first status.cfg carries it */
+    g_pen_probe = g_pen_present;
+    /* Off-heartbeat re-probing: see pen_probe_thread. If the thread cannot
+     * start, presence just stays at the startup answer; liveness is fine,
+     * but say so: a silently frozen pen readout would be undiagnosable. */
+    g_pen_thread = (HANDLE)_beginthreadex(NULL, 0, pen_probe_thread, NULL, 0, NULL);
+    if (!g_pen_thread)
+        LOGF("pen probe thread failed to start (errno=%d): presence stays at the startup answer\n", errno);
 
     /* Fullscreen (virtual desktop) layered+transparent+topmost overlay. */
     WNDCLASSW wc; ZeroMemory(&wc, sizeof(wc));
@@ -933,6 +1040,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     if (!hwnd) {
         wchar_t b[128]; wsprintfW(b, L"CreateWindowExW failed: %lu", GetLastError());
         MessageBoxW(NULL, b, L"Tracey", MB_OK | MB_ICONERROR);
+        stop_pen_thread();
+        close_log();
         return 1;
     }
     SetLayeredWindowAttributes(hwnd, 0, 1, LWA_ALPHA);
@@ -962,7 +1071,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
             okReg, regErr, g_dev ? L"created" : L"n/a");
         MessageBoxW(NULL, eb, L"Tracey", MB_OK | MB_ICONERROR);
         if (g_dev) DestroySyntheticPointerDevice(g_dev);
-        if (g_log) fclose(g_log);
+        stop_pen_thread();
+        close_log();
         return 2;
     }
 
@@ -990,7 +1100,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
         MSG msg;
         while (GetMessageW(&msg, NULL, 0, 0)) { TranslateMessage(&msg); DispatchMessageW(&msg); }
         UnregisterPointerInputTarget(hwnd, PT_PEN);
-        if (g_log) fclose(g_log);
+        stop_pen_thread();
+        close_log();
         return 0;
     }
 
@@ -1045,6 +1156,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     for (int k = 0; k < 3; k++) UnregisterHotKey(hwnd, 11 + k);
     if (g_registered) UnregisterPointerInputTarget(hwnd, PT_PEN);
     if (g_dev) DestroySyntheticPointerDevice(g_dev);   /* NULL if creation failed */
+    stop_pen_thread();
     write_status(0, g_notch_seed_hz);   /* tell the UI we've stopped */
 
     double reduction = (g_rawlen > 0.0) ? (100.0 * (g_rawlen - g_filtlen) / g_rawlen) : 0.0;
@@ -1054,7 +1166,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
     LOGF("latency inject_avg=%.0fus inject_max=%.0fus n=%u | pen_gap_avg=%.1fms pen_gap_max=%.1fms n=%u\n",
          g_injN ? g_injUs_total / g_injN : 0.0, g_injUs_max, g_injN,
          g_gapN ? g_gapMs_total / g_gapN : 0.0, g_gapMs_max, g_gapN);
-    if (!g_debug) { if (g_log) fclose(g_log); return 0; }
+    if (!g_debug) { close_log(); return 0; }
 
     wchar_t qb[600];
     wsprintfW(qb,
@@ -1069,6 +1181,6 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR pCmd, int nShow) {
         (int)(g_cur_fmin * 100 + 0.5), (int)(g_cur_beta * 1000 + 0.5),
         g_preset >= 0 ? L"preset" : L"calibrated");
     MessageBoxW(NULL, qb, L"Tracey - summary", MB_OK | MB_ICONINFORMATION);
-    if (g_log) fclose(g_log);
+    close_log();
     return 0;
 }

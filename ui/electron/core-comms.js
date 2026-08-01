@@ -172,12 +172,15 @@ class CoreComms {
     this._listeners = new Set();
     this._profile = null;      // cached profile.cfg; see readProfile()
     this._profileAt = -1;      // its mtime, so it is re-read only when it changes
+    this._lastGood = null;     // last status read that actually carried running=
+    this._lastGoodAt = 0;      // wall clock of that read; bounds the torn fallback
     this.tablet = { checked: false, pen: null, ready: null, flags: null };
   }
 
   setDir(dir) {
     this.dir = dir;
     this._profile = null; this._profileAt = -1;   // cache belongs to the old folder
+    this._lastGood = null; this._lastGoodAt = 0;  // so does the last-known status
     this.configPath = path.join(dir, 'config.cfg');
     this.statusPath = path.join(dir, 'status.cfg');
     if (this._watcher || this._poll) this.watch(); // rebind to the new folder
@@ -189,20 +192,49 @@ class CoreComms {
 
   /** Read status.cfg. Never throws — a missing file is a normal state. */
   readStatus() {
+    const gone = (reason) => ({
+      present: false,
+      reason,
+      running: 0, enabled: 0, fmin: null, beta: null, preset: null, tremor_hz: null,
+      calibrating: 0, cal_hz: null, cal_samples: null, pen: null,
+      stale: false, ageMs: null,
+    });
     let raw, ageMs = null;
     try {
       raw = fs.readFileSync(this.statusPath, 'utf8');
       ageMs = Date.now() - fs.statSync(this.statusPath).mtimeMs;
     } catch (err) {
-      return {
-        present: false,
-        reason: err.code === 'ENOENT' ? 'missing' : err.code,
-        running: 0, enabled: 0, fmin: null, beta: null, preset: null, tremor_hz: null,
-        calibrating: 0, cal_hz: null, cal_samples: null, pen: null,
-        stale: false, ageMs: null,
-      };
+      if (err.code === 'ENOENT') {
+        // Definitive: no core has written here, or the file was removed.
+        this._lastGood = null; this._lastGoodAt = 0;
+        return gone('missing');
+      }
+      // Any other error (a sharing violation while the core replaces the
+      // file) is transient and INDETERMINATE, not "core gone": the same
+      // reasoning readProfile applies to the Custom card. Bounded by
+      // STALE_MS of wall clock so a persistent failure still reads as gone.
+      if (this._lastGood && Date.now() - this._lastGoodAt <= STALE_MS) {
+        this.logUi(`status.cfg transient read error (${err.code}); kept last known status`);
+        return { ...this._lastGood, torn: true, reason: err.code };
+      }
+      return gone(err.code);
     }
     const c = parseCfg(raw);
+
+    // A zero-length read, or one missing the running key a previous read
+    // carried, is a reader landing inside a writer's truncate-then-write
+    // window, not a statement that the core stopped. Fabricating running=0
+    // from it is what used to destroy the tray on a single bad read: report
+    // the last known status flagged torn instead, so an empty read can never
+    // reach trayState(). A torn file OLDER than STALE_MS is different: that
+    // is a core that died mid-write, and it falls through to the normal
+    // verdict below (no keys, running 0).
+    const torn = raw.length === 0 || c.running === undefined;
+    if (torn && this._lastGood && !(ageMs > STALE_MS)) {
+      this.logUi(`status.cfg torn read (${raw.length} bytes, age ` +
+                 `${Math.round(ageMs)} ms); kept last known status`);
+      return { ...this._lastGood, torn: true, ageMs };
+    }
     const claimsRunning = num(c.running, 0) ? 1 : 0;
 
     // Only judge staleness when the core actually heartbeats. An older core build
@@ -211,7 +243,7 @@ class CoreComms {
     const heartbeats = c.heartbeat !== undefined;
     const stale = heartbeats && claimsRunning === 1 && ageMs !== null && ageMs > STALE_MS;
 
-    return {
+    const out = {
       present: true,
       reason: null,
       running: stale ? 0 : claimsRunning,   // a dead core is not running, whatever the file says
@@ -234,6 +266,8 @@ class CoreComms {
       ageMs,
       raw: c,
     };
+    if (!torn) { this._lastGood = out; this._lastGoodAt = Date.now(); }
+    return out;
   }
 
   /**

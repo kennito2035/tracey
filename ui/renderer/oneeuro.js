@@ -1,10 +1,15 @@
 'use strict';
 /**
- * One-euro filter — PREVIEW ONLY.
+ * One-euro filter, PREVIEW ONLY.
  *
- * This mirrors the shape of the core's common/oneeuro.h so the sliders feel
- * honest in this window. It never touches real input; the core does that.
- * If the two ever disagree, the C implementation is the source of truth.
+ * Matches src/common/oneeuro.h including its deliberate quirk: the velocity
+ * estimate is taken from the previous FILTERED output, not from the previous
+ * raw sample (the canonical Casiez 2012 form). The core is non-canonical on
+ * purpose, and every published number is measured against that variant, so
+ * the pad must ship the same one or the sliders lie about the shipped feel.
+ * If the two ever disagree, the C implementation is the source of truth:
+ * change this file, never the header. Parity is enforced by tools/verify.js.
+ * This never touches real input; the core does that.
  */
 
 function alphaFor(cutoffHz, dt) {
@@ -28,20 +33,34 @@ class OneEuro {
     this.dCutoff = dCutoff;
     this.x = new LowPass();
     this.dx = new LowPass();
-    this.xPrev = null;
     this.tPrev = null;
   }
 
   setParams(fmin, beta) { this.fmin = fmin; this.beta = beta; }
 
-  reset() { this.x.reset(); this.dx.reset(); this.xPrev = null; this.tPrev = null; }
+  reset() { this.x.reset(); this.dx.reset(); this.tPrev = null; }
 
   filter(x, tSeconds) {
-    const dt = this.tPrev === null ? 1 / 60 : Math.max(1e-4, tSeconds - this.tPrev);
+    // A repeated or backwards timestamp returns the last output and changes
+    // no state, matching oneeuro_filter's `if (dt <= 0.0) return f->x_prev;`.
+    // Clamping dt to a tiny floor instead (what this used to do) fabricates a
+    // huge rate, and the derivative low-pass then inflates the cutoff for
+    // ~0.16 s afterwards. That is not academic: Chromium coalesces several
+    // pointer samples per frame under one millisecond-resolution timeStamp,
+    // so a mouse or a fast pen delivers dt = 0 constantly. Measured against
+    // the core's form on a 6 Hz tremor stroke: 3.67 px mean divergence at
+    // Steadiest with the floor, 0 without it.
+    if (this.tPrev !== null && tSeconds - this.tPrev <= 0) {
+      return this.x.s === null ? x : this.x.s;
+    }
+    const dt = this.tPrev === null ? 1 / 60 : tSeconds - this.tPrev;
     this.tPrev = tSeconds;
 
-    const rate = this.xPrev === null ? 0 : (x - this.xPrev) / dt;
-    this.xPrev = x;
+    // Velocity from the previous FILTERED output, read before this.x.filter()
+    // overwrites it. Deliberately not the canonical previous-raw-sample form:
+    // see the header comment.
+    const prev = this.x.s;
+    const rate = prev === null ? 0 : (x - prev) / dt;
 
     const edx = this.dx.filter(rate, alphaFor(this.dCutoff, dt));
     const cutoff = this.fmin + this.beta * Math.abs(edx);

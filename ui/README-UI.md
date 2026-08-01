@@ -20,10 +20,15 @@ HTML/CSS/JS, so a fresh clone is running in about a minute.
 npm run verify
 ```
 
-64 checks of the UI's side of the control channel against the mock core, in a
-scratch temp folder. Expect `64 passed, 0 failed`. The last 14 are a matrix over
-`matchPreset()`, extracted live out of `app.js`: three shipped defects have come
-out of that one function, so it is no longer spot-checked.
+78 checks of the UI's side of the control channel against the mock core, in a
+scratch temp folder. Expect `78 passed, 0 failed`. Fourteen of them are a matrix
+over `matchPreset()`, extracted live out of `app.js`: three shipped defects have
+come out of that one function, so it is no longer spot-checked. Six more pin the
+practice pad's one-euro filter to the core's exact variant (velocity from the
+previous filtered output), over both a clean stroke and a coalesced one that
+repeats timestamps, so the pad cannot drift canonical again. Eight more freeze
+the status.cfg torn-read window (empty, keyless, transient-error, stale and
+deleted reads), so one bad read can never again report a live core as stopped.
 
 ```
 node tools/audit.js
@@ -174,7 +179,7 @@ renderer/
   oneeuro.js      preview filter only; the C version is the source of truth
 tools/
   mock-core.js    stand-in for the core (mock-core.cmd / .sh wrap it)
-  verify.js       the 64-check contract suite (npm run verify)
+  verify.js       the 78-check contract suite (npm run verify)
   audit.js        cross-layer consistency (node tools/audit.js)
   prepare-core.js stages the signed core + .cer into build/core/ before packing;
                   refuses to build if the core is missing or unsigned

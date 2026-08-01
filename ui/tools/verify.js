@@ -24,12 +24,41 @@ require('fs').rmSync(SCRATCH,{recursive:true,force:true});
 require('fs').mkdirSync(SCRATCH,{recursive:true});
 const core=new CoreComms(SCRATCH);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-function waitFor(t,to){return new Promise((res,rej)=>{const t0=Date.now();
+// `what` names the fact being waited on, so a timeout says WHAT never
+// happened instead of the bare 'timeout' that made a prior flaky run
+// undiagnosable.
+function waitFor(t,to,what){return new Promise((res,rej)=>{const t0=Date.now();
  const iv=setInterval(()=>{const s=core.readStatus();
-  if(t(s)){clearInterval(iv);res(s);}else if(Date.now()-t0>to){clearInterval(iv);rej(new Error('timeout'));}},200);});}
-const launch=a=>{const c=spawn(process.execPath,[MOCK,...a],{stdio:'ignore',detached:true,env:process.env});c.unref();return c;};
+  if(t(s)){clearInterval(iv);res(s);}else if(Date.now()-t0>to){clearInterval(iv);
+   rej(new Error('timeout'+(what?' waiting for '+what:'')));}},200);});}
+const CHILDREN=[];
+const launch=a=>{const c=spawn(process.execPath,[MOCK,...a],{stdio:'ignore',detached:true,env:process.env});c.unref();CHILDREN.push(c);return c;};
+// Emergency teardown: ask the mock to quit politely, then kill only children
+// that have NOT already exited. Windows recycles PIDs quickly, so killing a
+// long-dead mock's PID could terminate an unrelated process that inherited it.
+const teardown=()=>{
+ try{core.writeConfig({enabled:0,fmin:0.4,beta:0.02,quit:1});}catch{/* best effort */}
+ for(const c of CHILDREN){
+  if(c.exitCode===null&&c.signalCode===null){try{process.kill(c.pid);}catch{/* already gone */}}
+ }
+};
+// Ctrl+C or a CI kill must not strand the detached mock either: a survivor
+// keeps rewriting the scratch status.cfg five times a second and makes the
+// NEXT run fail its three kill-liveness checks with no hint why.
+process.on('SIGINT',()=>{teardown();process.exit(130);});
+process.on('SIGTERM',()=>{teardown();process.exit(143);});
+// An exception escaping a timer callback (waitFor's interval runs outside the
+// async chain) would bypass the promise catch entirely; without these hooks it
+// would strand the mock exactly like the pre-fix crash path did.
+process.on('uncaughtException',(e)=>{console.error('ERROR',e.message);
+ if(FAILED.length)console.error('failed checks before the crash:\n  - '+FAILED.join('\n  - '));
+ teardown();process.exit(1);});
+process.on('unhandledRejection',(e)=>{console.error('ERROR',e&&e.message?e.message:String(e));
+ if(FAILED.length)console.error('failed checks before the crash:\n  - '+FAILED.join('\n  - '));
+ teardown();process.exit(1);});
 let pass=0,fail=0;
-const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log('  FAIL',n);} };
+const FAILED=[];
+const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;FAILED.push(n);console.log('  FAIL',n);} };
 (async()=>{
  console.log('--- cold state ---');
  t('status missing before core', core.readStatus().present===false);
@@ -37,16 +66,19 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
 
  console.log('--- start + enable ---');
  core.writeConfig({enabled:0,fmin:0.4,beta:0.02}); launch([]);
- await waitFor(s=>s.running,6000);
+ await waitFor(s=>s.running,18000,'the mock to start');
  t('core running', core.readStatus().running===1);
  t('paused state', core.readStatus().enabled===0);
  core.writeConfig({enabled:1,fmin:0.4,beta:0.02});
- await waitFor(s=>s.enabled===1,3000);
+ await waitFor(s=>s.enabled===1,9000,'enable=1 to apply');
  t('enable applied live', core.readStatus().enabled===1);
 
  console.log('--- clamping ---');
  core.writeConfig({enabled:1,fmin:99,beta:0});
- await sleep(600);
+ // Wait for the FACT (the mock echoing the clamped pair), not a guess at its
+ // latency: a fixed sleep here is a race on a loaded machine.
+ await waitFor(s=>Math.abs(s.fmin-1.0)<1e-6&&Math.abs(s.beta-0.007)<1e-9,9000,
+               'the mock to echo the clamped write');
  const c=core.readStatus();
  t('fmin clamped to 1.0', Math.abs(c.fmin-1.0)<1e-6);
  t('beta clamped to 0.007', Math.abs(c.beta-0.007)<1e-9);
@@ -56,16 +88,17 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
  console.log('--- calibration sequence ---');
  const snap={enabled:1,fmin:0.4,beta:0.02};
  core.writeConfig({...snap,quit:1});
- await waitFor(s=>!s.running,8000); t('quit=1 stops core', core.readStatus().running===0);
+ await waitFor(s=>!s.running,24000,'quit=1 to stop the core');
+ t('quit=1 stops core', core.readStatus().running===0);
  core.writeConfig(snap); await sleep(300);
  t('quit cleared', !fs.readFileSync(path.join(SCRATCH,'config.cfg'),'utf8').includes('quit'));
  launch(['--calibrate']);
- await waitFor(s=>s.running,5000); t('calibrate started', true);
- await waitFor(s=>!s.running,30000);
+ await waitFor(s=>s.running,15000,'the calibrate mock to start'); t('calibrate started', true);
+ await waitFor(s=>!s.running,90000,'standalone calibration to finish');
  const hz=core.readStatus().tremor_hz;
  t('tremor_hz read', typeof hz==='number' && hz>5 && hz<12);
  core.writeConfig(snap); await sleep(200); launch([]);
- await waitFor(s=>s.running,8000);
+ await waitFor(s=>s.running,24000,'the filter mock to relaunch');
  t('filter relaunched', core.readStatus().running===1);
  t('enabled restored', core.readStatus().enabled===1);
 
@@ -78,14 +111,14 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   const snap = { enabled: 1, fmin: 0.4, beta: 0.02 };
   const hzBefore = core.readStatus().cal_hz;
   core.writeConfig({ ...snap, calibrate: 1 });
-  await waitFor(s => s.calibrating === 1, 5000);
+  await waitFor(s => s.calibrating === 1, 15000, 'calibrating=1 to appear');
   t('calibrate=1 starts calibration', core.readStatus().calibrating === 1);
   t('core stays RUNNING while calibrating', core.readStatus().running === 1);
 
   core.writeConfig(snap);                       // clear the one-shot mid-measurement
   t('calibrate key cleared', !fs.readFileSync(path.join(SCRATCH,'config.cfg'),'utf8').includes('calibrate'));
 
-  await waitFor(s => !s.calibrating, 20000);
+  await waitFor(s => !s.calibrating, 60000, 'in-process calibration to finish');
   const done = core.readStatus();
   t('core still running afterwards (no relaunch needed)', done.running === 1);
   t('cal_hz latched as the result', typeof done.cal_hz === 'number' && done.cal_hz > 5 && done.cal_hz < 12);
@@ -96,8 +129,10 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
 
   // THE reason calibrate must be one-shot: an ordinary slider write afterwards
   // must not start another 10-second measurement under the user's hands.
+  // Wait for the write itself to land (the fact), then assert the negative:
+  // a fixed sleep was a guess at the mock's poll latency.
   core.writeConfig({ ...snap, fmin: 0.5 });
-  await sleep(800);
+  await waitFor(s => Math.abs(s.fmin - 0.5) < 1e-9, 9000, 'the fmin=0.5 write to land');
   t('an ordinary write does not re-trigger calibration', core.readStatus().calibrating === 0);
   core.writeConfig(snap); await sleep(400);
  }
@@ -145,19 +180,30 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
  // and a reimplementation would only ever test the reimplementation.
  {
   const asrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
-  const body = (re) => {
+  // Anchors must accept ;\r\n as well as ;\n: with `* text=auto` a default
+  // Windows clone checks app.js out with CRLF, and a null match here used to
+  // kill the whole suite at this section with no summary. Fail loudly instead,
+  // never with a TypeError on null.
+  const mustMatch = (re) => {
    const m = asrc.match(re);
+   if (!m) throw new Error(`verify.js could not extract ${re} from renderer/app.js`);
+   return m;
+  };
+  const body = (re) => {
+   const m = mustMatch(re);
    let i = asrc.indexOf('{', m.index), d = 0;
    for (let j = i; j < asrc.length; j++) {
     if (asrc[j] === '{') d++;
     else if (asrc[j] === '}') { d--; if (d === 0) return asrc.slice(m.index, j + 1); }
    }
-   return null;
+   // Unbalanced braces would otherwise inject the literal text 'null' into
+   // the new Function source and surface as an unnamed TypeError later.
+   throw new Error(`verify.js could not extract a balanced body for ${re} from renderer/app.js`);
   };
   const ui = {};
   const R = new Function('ui', 'PRESETS',
-   asrc.match(/const CUSTOM_ID = \d+;/)[0] + '\n' +
-   asrc.match(/const samePair =[\s\S]*?;\n/)[0] + '\n' +
+   mustMatch(/const CUSTOM_ID = \d+;/)[0] + '\n' +
+   mustMatch(/const samePair =[\s\S]*?;\r?\n/)[0] + '\n' +
    body(/function matchPreset\(/) +
    '\nreturn { matchPreset, CUSTOM_ID };')(ui, PRESETS);
 
@@ -211,6 +257,74 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   t('stopping the core clears the highlight', afterStop === 0);
  }
 
+ console.log('--- practice pad filter parity (renderer oneeuro.js vs core oneeuro.h) ---');
+ // The pad shipped the canonical Casiez form (velocity from the previous RAW
+ // sample) while the core derives velocity from the previous FILTERED output,
+ // so the pad smoothed up to 2.7x harder than the product at Steadiest. Every
+ // published number is measured against the core's variant; the pad must
+ // produce the same output or the sliders misrepresent the shipped feel. This
+ // runs the REAL renderer source against a local statement-for-statement port
+ // of src/common/oneeuro.h so the two can never silently diverge again.
+ {
+  const osrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'oneeuro.js'), 'utf8');
+  const pad = new Function(osrc + '\nreturn { OneEuro };')();
+
+  const refOneEuro = (fmin, beta, dCutoff) => {
+   let xPrev = 0, dxPrev = 0, tPrev = 0, primed = false;
+   const alpha = (cutoff, dt) => { const r = 2 * Math.PI * cutoff * dt; return r / (r + 1); };
+   return (x, tt) => {
+    if (!primed) { primed = true; xPrev = x; tPrev = tt; return x; }
+    const dt = tt - tPrev;
+    if (dt <= 0) return xPrev;
+    const dxRaw = (x - xPrev) / dt;
+    const aD = alpha(dCutoff, dt);
+    const dxHat = aD * dxRaw + (1 - aD) * dxPrev;
+    const fc = fmin + beta * Math.abs(dxHat);
+    const a = alpha(fc, dt);
+    const xHat = a * x + (1 - a) * xPrev;
+    xPrev = xHat; dxPrev = dxHat; tPrev = tt;
+    return xHat;
+   };
+  };
+
+  // Two strokes, because the first one alone missed a real divergence.
+  //
+  // CLEAN: steady travel with a 6 Hz tremor plus an 11 Hz texture, sampled at
+  // a strict 200 Hz for 2.4 s (480 samples; the coalesced stroke covers 2.0 s).
+  //
+  // COALESCED: the same stroke delivered the way Chromium actually delivers
+  // it, four samples per 60 Hz frame sharing ONE millisecond-resolution
+  // timeStamp (app.js reads getCoalescedEvents), so three of every four
+  // samples arrive with dt = 0. The pad used to clamp dt to a floor there and
+  // diverge by 3.67 px at Steadiest while the clean stroke still matched to
+  // 1e-13, which is exactly how the divergence hid.
+  const strokes = {
+   clean: (i) => {
+    const ts = i / 200;
+    return [300 * ts + 8 * Math.sin(2 * Math.PI * 6 * ts) +
+            1.5 * Math.sin(2 * Math.PI * 11 * ts), ts];
+   },
+   coalesced: (i) => {
+    const frame = Math.floor(i / 4), k = i % 4;
+    const trueT = frame / 60 + k / 240;
+    return [300 * trueT + 8 * Math.sin(2 * Math.PI * 6 * trueT),
+            Math.round(frame * 1000 / 60) / 1000];
+   },
+  };
+  for (const [label, stroke] of Object.entries(strokes)) {
+   for (const p of PRESETS) {
+    const mine = new pad.OneEuro(p.fmin, p.beta);
+    const ref = refOneEuro(p.fmin, p.beta, 1.0);
+    let sum = 0, n = 0;
+    for (let i = 0; i < 480; i++) {
+     const [x, ts] = stroke(i);
+     sum += Math.abs(mine.filter(x, ts) - ref(x, ts)); n++;
+    }
+    t(`pad filter matches the core (${p.name}, ${label})`, sum / n < 1e-9);
+   }
+  }
+ }
+
  console.log('--- calibration path ---');
  // The wizard draws this. It comes from the CORE, not from the system cursor:
  // the cursor moves for any pointing device, so sampling it drew the TOUCHPAD.
@@ -260,28 +374,85 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   t('absent pen key is UNKNOWN', isoCore.readStatus().pen === null);
  }
 
+ console.log('--- torn status reads (the truncate-then-write window) ---');
+ // status.cfg used to be truncated in place by the core: between open and
+ // close the file is legitimately EMPTY. readFileSync succeeds, no key
+ // parses, running defaulted to 0, and one such read reached trayState and
+ // destroyed the tray. The window is frozen here at its observable moments:
+ // an empty file, a keyless read, and a transient non-ENOENT read error (a
+ // sharing violation while the core replaces the file). Each must report the
+ // LAST KNOWN status flagged torn, never a fabricated running=0. An empty
+ // file OLDER than the staleness threshold is a core that died mid-write and
+ // must still read as dead; a DELETED file stays definitive.
+ {
+  const iso = path.join(SCRATCH, 'torn');
+  fs.mkdirSync(iso, { recursive: true });
+  const tc = new CoreComms(iso);
+  const f = path.join(iso, 'status.cfg');
+  const base = 'running=1\nenabled=1\nfmin=0.4000\nbeta=0.02000\npreset=2\n' +
+               'tremor_hz=0.00\ncalibrating=0\ncal_hz=0.00\ncal_samples=0\n' +
+               'pen=1\nheartbeat=7\n';
+  fs.writeFileSync(f, base);
+  t('good read seeds the last-known status', tc.readStatus().running === 1);
+  fs.writeFileSync(f, '');                                // the window, frozen
+  const torn = tc.readStatus();
+  t('empty read is torn, not core-gone', torn.torn === true && torn.running === 1);
+  t('a torn read can never map to trayState off', torn.present !== false && torn.running !== 0);
+  fs.writeFileSync(f, 'enabled=1\nheartbeat=8\n');        // running key missing
+  const keyless = tc.readStatus();
+  t('keyless read is torn, not core-gone', keyless.torn === true && keyless.running === 1);
+  const realRead = fs.readFileSync;
+  try {
+   fs.readFileSync = (p, ...a) => {
+    if (String(p) === f) { const e = new Error('busy'); e.code = 'EPERM'; throw e; }
+    return realRead(p, ...a);
+   };
+   const blocked = tc.readStatus();
+   t('transient read error is torn, not core-gone', blocked.torn === true && blocked.running === 1);
+  } finally { fs.readFileSync = realRead; }
+  fs.writeFileSync(f, '');
+  const old = new Date(Date.now() - 10000);
+  fs.utimesSync(f, old, old);                             // empty AND stale
+  t('an old empty file still reads as dead', tc.readStatus().running === 0);
+  fs.writeFileSync(f, base);
+  const back = tc.readStatus();
+  t('recovery resumes normal reads', back.running === 1 && back.torn === undefined);
+  fs.rmSync(f, { force: true });
+  t('a deleted file is definitive, not torn', tc.readStatus().present === false);
+ }
+
  console.log('--- liveness / heartbeat ---');
  // Start from a clean slate: the mock's mutex refuses to launch while a core is up.
  core.writeConfig({...snap,quit:1});
- await waitFor(s=>!s.running,8000);
+ await waitFor(s=>!s.running,24000,'quit=1 to stop the core before liveness');
  core.writeConfig(snap); await sleep(300);
  const child=launch([]);
- await waitFor(s=>s.running,8000);
+ await waitFor(s=>s.running,24000,'the liveness mock to start');
  const hb1=Number(core.readStatus().raw.heartbeat);
- await sleep(1200);
- const hb2=Number(core.readStatus().raw.heartbeat);
+ // Wait for the advance itself rather than sleeping a guessed interval.
+ const hbS=await waitFor(s=>s.raw&&Number(s.raw.heartbeat)>hb1,9000,'the heartbeat to advance');
+ const hb2=Number(hbS.raw.heartbeat);
  t('heartbeat present', Number.isFinite(hb1));
  t('heartbeat advances while alive', hb2>hb1);
  t('tremor_hz always written (0 = uncalibrated)', typeof core.readStatus().tremor_hz==='number');
 
  // Hard-kill, like ending the task in Task Manager: the core never gets to
  // write running=0, so status.cfg is left claiming the pen is being filtered.
+ // Staleness needs the file AGE to cross STALE_MS, so wait for the verdict
+ // itself: a fixed sleep raced the poll interval on a loaded machine.
  try { process.kill(child.pid, 'SIGKILL'); } catch { /* already gone */ }
- await sleep(3500);
+ await waitFor(s=>s.stale===true,15000,'status.cfg to go stale after the hard kill');
  const stale=core.readStatus();
  const ageMs=Date.now()-fs.statSync(path.join(SCRATCH,'status.cfg')).mtimeMs;
  t('killed core leaves running=1 in the file', Number(stale.raw.running)===1);
- t('heartbeat stops advancing after kill', Number(stale.raw.heartbeat)===hb2);
+ // hb2 was sampled BEFORE the kill, and the mock's independent 200 ms writer
+ // can land one more write in the few ms between that sample and
+ // TerminateProcess, so strict equality with hb2 was a latent race. Frozen
+ // is proven by two post-kill reads agreeing (staleness already proved no
+ // write for 3 s) and by the counter never moving backwards.
+ const hbDead=Number(stale.raw.heartbeat);
+ t('heartbeat stops advancing after kill',
+   hbDead>=hb2 && Number(core.readStatus().raw.heartbeat)===hbDead);
  t('status.cfg goes stale (>3s)', ageMs>3000);
  // THE requirement this suite exists to enforce.
  t('UI reports a killed core as NOT running', stale.running===0 && stale.stale===true);
@@ -308,17 +479,31 @@ const t=(n,c)=>{ if(c){pass++;console.log('  PASS',n);} else {fail++;console.log
   const r = await core.launchCore([]);
   t('launchCore reports ok', r.ok === true);
   let ran = false;
-  for (let i = 0; i < 50 && !ran; i++) { await sleep(100); ran = fs.existsSync(marker); }
+  // 30 s budget: powershell cold start + ShellExecute + a cmd stub is the
+  // slowest chain in the suite, and the old 5 s cap was the one remaining
+  // fixed budget of the class the mock-start waits were raised for.
+  for (let i = 0; i < 300 && !ran; i++) { await sleep(100); ran = fs.existsSync(marker); }
   t('launchCore actually ran the target', ran);
   core.exePath = realExe;
  }
 
  console.log('--- teardown ---');
  core.writeConfig(snap); await sleep(200); launch([]);
- await waitFor(s=>s.running,8000);
+ await waitFor(s=>s.running,24000,'the teardown mock to start');
  core.writeConfig({...snap,quit:1});
- await waitFor(s=>!s.running,8000); t('final stop', core.readStatus().running===0);
+ await waitFor(s=>!s.running,24000,'the final quit to stop the core');
+ t('final stop', core.readStatus().running===0);
 
  console.log(`\n${pass} passed, ${fail} failed`);
+ if(fail)console.log('failed checks:\n  - '+FAILED.join('\n  - '));
  process.exit(fail?1:0);
-})().catch(e=>{console.error('ERROR',e.message);process.exit(1);});
+})().catch(e=>{
+ console.error('ERROR',e.message);
+ // Name every check that had already failed: a crash that reports only the
+ // thrown error hides which assertions were red before it.
+ if(FAILED.length)console.error('failed checks before the crash:\n  - '+FAILED.join('\n  - '));
+ // A crash must not strand the detached mock: it would keep rewriting the
+ // scratch status.cfg five times a second forever.
+ teardown();
+ process.exit(1);
+});
